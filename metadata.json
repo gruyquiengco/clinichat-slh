@@ -1,0 +1,8 @@
+{
+  "name": "CliniChat SLH ver1",
+  "description": "A Viber-styled patient database system with integrated chat threads, audit trails, and role-based access control, compliant with Philippine Data Privacy Act.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
