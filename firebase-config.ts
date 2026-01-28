@@ -3,12 +3,13 @@ import { getFirestore } from "firebase/firestore";
 
 // REPLACE THE VALUES BELOW WITH YOUR FIREBASE PROJECT CONFIG
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+ apiKey: "AIzaSyAVDlpJswapXPm-bdmhMee6d1zEA73l63U",
+  authDomain: "clinichat-slh.firebaseapp.com",
+  projectId: "clinichat-slh",
+  storageBucket: "clinichat-slh.firebasestorage.app",
+  messagingSenderId: "603242046972",
+  appId: "1:603242046972:web:2ae96ef16d0c0263bbbe79",
+  measurementId: "G-JTVRF4YT1F"
 };
 
 const app = initializeApp(firebaseConfig);
