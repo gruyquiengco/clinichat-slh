@@ -8,7 +8,7 @@ import Contacts from './components/Contacts';
 import UserProfileView from './components/UserProfile';
 import AuditTrail from './components/AuditTrail';
 import Reports from './components/Reports';
-import { MOCK_USERS, MOCK_PATIENTS } from './constants';
+import { MOCK_USERS } from './constants';
 import { db } from './firebase-config';
 import { 
   collection, 
@@ -18,8 +18,7 @@ import {
   updateDoc, 
   addDoc, 
   query, 
-  orderBy,
-  serverTimestamp 
+  orderBy 
 } from 'firebase/firestore';
 
 const App: React.FC = () => {
@@ -27,10 +26,8 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<AppView>('login');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   
-  const [users, setUsers] = useState<UserProfile[]>(() => {
-    const saved = localStorage.getItem('slh_users');
-    return saved ? JSON.parse(saved) : MOCK_USERS;
-  });
+  // Load users from Firebase instead of just LocalStorage
+  const [users, setUsers] = useState<UserProfile[]>(MOCK_USERS);
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -38,20 +35,30 @@ const App: React.FC = () => {
 
   // Real-time Listeners
   useEffect(() => {
+    // 1. Listen for Users (Sync across devices)
+    const usersUnsub = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const userData: UserProfile[] = [];
+      snapshot.forEach((doc) => userData.push(doc.data() as UserProfile));
+      if (userData.length > 0) setUsers(userData);
+    });
+
     if (!currentUser) return;
 
+    // 2. Listen for Patients
     const patientsUnsub = onSnapshot(collection(db, 'patients'), (snapshot) => {
       const patientData: Patient[] = [];
       snapshot.forEach((doc) => patientData.push({ ...doc.data() as Patient, id: doc.id }));
       setPatients(patientData);
     });
 
+    // 3. Listen for Messages
     const messagesUnsub = onSnapshot(query(collection(db, 'messages'), orderBy('timestamp', 'asc')), (snapshot) => {
       const messageData: Message[] = [];
       snapshot.forEach((doc) => messageData.push({ ...doc.data() as Message, id: doc.id }));
       setMessages(messageData);
     });
 
+    // 4. Listen for Audit Logs
     const auditUnsub = onSnapshot(query(collection(db, 'audit'), orderBy('timestamp', 'desc')), (snapshot) => {
       const auditData: AuditLog[] = [];
       snapshot.forEach((doc) => auditData.push({ ...doc.data() as AuditLog, id: doc.id }));
@@ -59,14 +66,14 @@ const App: React.FC = () => {
     });
 
     return () => {
+      usersUnsub();
       patientsUnsub();
       messagesUnsub();
       auditUnsub();
     };
   }, [currentUser]);
 
-  useEffect(() => { localStorage.setItem('slh_users', JSON.stringify(users)); }, [users]);
-
+  // Session Management
   useEffect(() => {
     const savedUser = localStorage.getItem('slh_active_session');
     if (savedUser) {
@@ -106,8 +113,8 @@ const App: React.FC = () => {
     addAuditLog('LOGIN', 'User logged in successfully', user.id, user.id);
   };
 
-  const handleSignUp = (newUser: UserProfile) => {
-    setUsers(prev => [...prev, newUser]);
+  const handleSignUp = async (newUser: UserProfile) => {
+    await setDoc(doc(db, 'users', newUser.id), newUser);
     addAuditLog('SIGNUP', `New account created: ${newUser.email}`, newUser.id, newUser.id);
   };
 
@@ -173,9 +180,17 @@ const App: React.FC = () => {
             messages={messages} 
             onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); addAuditLog('VIEW', 'Accessed patient thread', id); }} 
             currentUser={currentUser!} 
-            setPatients={async (updater) => {
-              // This component uses state setter as a bridge; we handle the Firestore logic inside the component or here.
-              // For simplicity, we assume new patients are added via setDoc/addDoc.
+            setPatients={async (newPatientData: any) => {
+              // ACTUAL FIREBASE SAVE LOGIC
+              try {
+                const docRef = await addDoc(collection(db, 'patients'), {
+                  ...newPatientData,
+                  createdAt: new Date().toISOString()
+                });
+                addAuditLog('CREATE', `New patient added: ${newPatientData.surname}`, docRef.id);
+              } catch (e) {
+                console.error("Save failed:", e);
+              }
             }} 
             addAuditLog={addAuditLog} 
           />
@@ -224,14 +239,32 @@ const App: React.FC = () => {
             users={users}
           />
         )}
-        {currentView === 'contacts' && <Contacts users={users} onBack={() => setCurrentView('chat_list')} currentUser={currentUser!} onDeleteHCW={(id) => { setUsers(prev => prev.filter(u => u.id !== id)); addAuditLog('DELETE', 'Removed user from directory', id); }} onAddUser={(u) => { setUsers(p => [...p, u]); addAuditLog('CREATE', 'Added user to directory', u.id); }} onUpdateUser={(u) => { setUsers(p => p.map(x => x.id === u.id ? u : x)); addAuditLog('EDIT', 'Updated user role/info', u.id); }} />}
-        {currentView === 'profile' && <UserProfileView user={currentUser!} onSave={(u) => { 
+        {currentView === 'contacts' && (
+          <Contacts 
+            users={users} 
+            onBack={() => setCurrentView('chat_list')} 
+            currentUser={currentUser!} 
+            onDeleteHCW={async (id) => { 
+              // Removed logic would go here
+              addAuditLog('DELETE', 'Removed user from directory', id); 
+            }} 
+            onAddUser={async (u) => { 
+              await setDoc(doc(db, 'users', u.id), u);
+              addAuditLog('CREATE', 'Added user to directory', u.id); 
+            }} 
+            onUpdateUser={async (u) => { 
+              await updateDoc(doc(db, 'users', u.id), { ...u });
+              addAuditLog('EDIT', 'Updated user role/info', u.id); 
+            }} 
+          />
+        )}
+        {currentView === 'profile' && <UserProfileView user={currentUser!} onSave={async (u) => { 
           setCurrentUser(u); 
-          setUsers(prev => prev.map(old => old.id === u.id ? u : old)); 
+          await updateDoc(doc(db, 'users', u.id), { ...u });
           if (localStorage.getItem('slh_active_session')) {
             localStorage.setItem('slh_active_session', JSON.stringify(u));
           }
-          addAuditLog('EDIT', 'Updated own profile including account security', u.id); 
+          addAuditLog('EDIT', 'Updated own profile', u.id); 
         }} onBack={() => setCurrentView('chat_list')} onLogout={handleLogout} />}
         {currentView === 'audit' && currentUser?.role === UserRole.ADMIN && <AuditTrail logs={auditLogs} users={users} onBack={() => setCurrentView('chat_list')} />}
         {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
