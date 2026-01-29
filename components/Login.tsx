@@ -20,6 +20,17 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSignUp, users }) => {
   const [regPass, setRegPass] = useState('');
   const [regRole, setRegRole] = useState<UserRole>(UserRole.HCW_MD);
   const [regEmpId, setRegEmpId] = useState('');
+  const [regDept, setRegDept] = useState('Surgery'); // Default value
+
+  const departments = [
+    "Surgery",
+    "Internal Medicine",
+    "Adult IDS",
+    "Pediatrics",
+    "OB-Gyne",
+    "Anesthesia",
+    "Nursing"
+  ];
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,8 +52,8 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSignUp, users }) => {
       surname: regSurname,
       role: regRole,
       employeeId: regEmpId,
-      photo: '', // Handled by initials logic now
-      specialization: ''
+      photo: '', 
+      specialization: regDept // Department saved here
     };
     await onSignUp(newUser);
     setIsLogin(true);
@@ -85,6 +96,18 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSignUp, users }) => {
               <input type="email" placeholder="Work Email" required className="w-full p-3 bg-gray-50 rounded-xl border-none text-sm" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} />
               <input type="password" placeholder="Set Password" required className="w-full p-3 bg-gray-50 rounded-xl border-none text-sm" value={regPass} onChange={(e) => setRegPass(e.target.value)} />
               
+              <div className="grid grid-cols-1 gap-3">
+                <select 
+                  className="w-full p-3 bg-gray-50 rounded-xl border-none text-sm font-bold text-gray-700"
+                  value={regDept}
+                  onChange={(e) => setRegDept(e.target.value)}
+                >
+                  {departments.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <input placeholder="Employee ID" required className="p-3 bg-gray-50 rounded-xl border-none text-sm" value={regEmpId} onChange={(e) => setRegEmpId(e.target.value)} />
                 <select 
