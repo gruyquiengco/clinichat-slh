@@ -17,6 +17,17 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   const [showTempPassword, setShowTempPassword] = useState(false);
 
+  // Department List
+  const departments = [
+    "Surgery",
+    "Internal Medicine",
+    "Adult IDS",
+    "Pediatrics",
+    "OB-Gyne",
+    "Anesthesia",
+    "Nursing"
+  ];
+
   const capitalizeName = (str: string) => {
     return str
       .trim()
@@ -37,7 +48,7 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
     u.id !== currentUser.id &&
     (u.firstName.toLowerCase().includes(search.toLowerCase()) || 
      u.surname.toLowerCase().includes(search.toLowerCase()) ||
-     u.department.toLowerCase().includes(search.toLowerCase()))
+     (u.department && u.department.toLowerCase().includes(search.toLowerCase())))
   );
 
   const handleAddNewUser = (e: React.FormEvent<HTMLFormElement>) => {
@@ -51,7 +62,7 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
       surname: capitalizeName(formData.get('surname') as string),
       firstName: capitalizeName(formData.get('firstName') as string),
       specialization: formData.get('specialization') as string,
-      department: formData.get('department') as string,
+      department: formData.get('department') as string, // Now captured from dropdown
       email: formData.get('email') as string,
       phone: formData.get('phone') as string,
       role: selectedRole,
@@ -216,7 +227,11 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Department</label>
-                  <input name="department" required className="w-full p-2 bg-gray-50 dark:bg-gray-800 dark:text-white border dark:border-gray-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-500" />
+                  <select name="department" required className="w-full p-2 bg-gray-50 dark:bg-gray-800 dark:text-white border dark:border-gray-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-500">
+                    {departments.map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div>
