@@ -107,32 +107,25 @@ const App: React.FC = () => {
     } catch (e) { console.error("Audit log failed"); }
   }, [currentUser]);
 
+  // UPDATED: Now supports the 'type' field for images/videos
   const sendMessage = async (msg: Omit<Message, 'id' | 'timestamp' | 'reactions' | 'readBy'>) => {
     await addDoc(collection(db, 'messages'), {
       ...msg,
       timestamp: new Date().toISOString(),
       reactions: { check: [], cross: [] },
       readBy: [currentUser!.id],
+      type: msg.type || 'text'
     });
   };
 
-  // 2. NEW: MEDIA UPLOAD HANDLER
   const handleUploadMedia = async (file: File) => {
     if (!selectedPatientId || !currentUser) return;
     try {
-      // Create a unique path in storage
       const fileRef = ref(storage, `chats/${selectedPatientId}/${Date.now()}_${file.name}`);
-      
-      // Upload the file
       const snapshot = await uploadBytes(fileRef, file);
-      
-      // Get the URL
       const downloadURL = await getDownloadURL(snapshot.ref);
-      
-      // Determine type
       const fileType = file.type.startsWith('image/') ? 'image' : 'video';
 
-      // Send the message
       await sendMessage({
         content: downloadURL,
         senderId: currentUser.id,
@@ -253,8 +246,8 @@ const App: React.FC = () => {
               onSendMessage={sendMessage}
               onUpdatePatient={updatePatient}
               onDischarge={archivePatient}
-              onReadmit={readmitPatient} // Added onReadmit
-              onUploadMedia={handleUploadMedia} // Added media upload logic
+              onReadmit={readmitPatient}
+              onUploadMedia={handleUploadMedia}
               onAddMember={async (userId) => {
                 const p = patients.find(x => x.id === selectedPatientId);
                 if (p) await updateDoc(doc(db, 'patients', selectedPatientId), { members: [...p.members, userId] });
@@ -276,7 +269,6 @@ const App: React.FC = () => {
           {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
         </div>
 
-        {/* MOBILE NAVIGATION - ONLY SHOWN WHEN NOT IN THREAD */}
         {currentView !== 'thread' && (
           <div className="md:hidden h-16 bg-white dark:bg-viber-dark border-t border-gray-200 dark:border-gray-800 flex justify-around items-center px-2 z-[60] shrink-0">
             <button onClick={() => setCurrentView('chat_list')} className={`p-2 ${currentView === 'chat_list' ? 'text-purple-600' : 'text-gray-400'}`}>
