@@ -21,6 +21,9 @@ import {
   orderBy 
 } from 'firebase/firestore';
 
+// 1. IMPORT STORAGE UTILITIES
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [currentView, setCurrentView] = useState<AppView>('login');
@@ -29,6 +32,9 @@ const App: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+
+  // Initialize Storage
+  const storage = getStorage();
 
   // Real-time Listeners
   useEffect(() => {
@@ -101,6 +107,45 @@ const App: React.FC = () => {
     } catch (e) { console.error("Audit log failed"); }
   }, [currentUser]);
 
+  const sendMessage = async (msg: Omit<Message, 'id' | 'timestamp' | 'reactions' | 'readBy'>) => {
+    await addDoc(collection(db, 'messages'), {
+      ...msg,
+      timestamp: new Date().toISOString(),
+      reactions: { check: [], cross: [] },
+      readBy: [currentUser!.id],
+    });
+  };
+
+  // 2. NEW: MEDIA UPLOAD HANDLER
+  const handleUploadMedia = async (file: File) => {
+    if (!selectedPatientId || !currentUser) return;
+    try {
+      // Create a unique path in storage
+      const fileRef = ref(storage, `chats/${selectedPatientId}/${Date.now()}_${file.name}`);
+      
+      // Upload the file
+      const snapshot = await uploadBytes(fileRef, file);
+      
+      // Get the URL
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      // Determine type
+      const fileType = file.type.startsWith('image/') ? 'image' : 'video';
+
+      // Send the message
+      await sendMessage({
+        content: downloadURL,
+        senderId: currentUser.id,
+        patientId: selectedPatientId,
+        type: fileType as any,
+      });
+
+      addAuditLog('UPDATE', `Media uploaded: ${fileType}`, selectedPatientId);
+    } catch (e: any) {
+      alert("Upload failed: " + e.message);
+    }
+  };
+
   const handleLogin = (user: UserProfile, stayLoggedIn: boolean) => {
     setCurrentUser(user);
     if (stayLoggedIn) {
@@ -151,20 +196,11 @@ const App: React.FC = () => {
         isArchived: false, 
         dateDischarged: null,
         dateAdmitted: new Date().toISOString().split('T')[0],
-        members: [currentUser!.id] // Add readmitting HCW as first care team member
+        members: [currentUser!.id]
       });
       addAuditLog('UPDATE', `Patient readmitted: ${patient.surname}`, patient.id);
       alert("Patient has been readmitted to Active list.");
     } catch (e: any) { alert("Readmission failed: " + e.message); }
-  };
-
-  const sendMessage = async (msg: Omit<Message, 'id' | 'timestamp' | 'reactions' | 'readBy'>) => {
-    await addDoc(collection(db, 'messages'), {
-      ...msg,
-      timestamp: new Date().toISOString(),
-      reactions: { check: [], cross: [] },
-      readBy: [currentUser!.id],
-    });
   };
 
   if (currentView === 'login') {
@@ -212,13 +248,13 @@ const App: React.FC = () => {
               patient={patients.find(p => p.id === selectedPatientId)!}
               messages={messages.filter(m => m.patientId === selectedPatientId)}
               currentUser={currentUser!}
+              users={users}
               onBack={() => { setCurrentView('chat_list'); setSelectedPatientId(null); }}
               onSendMessage={sendMessage}
               onUpdatePatient={updatePatient}
-              onDischarge={archivePatient} // Mapped onDischarge to archivePatient function
-              onDeleteMessage={async (id) => {
-                await updateDoc(doc(db, 'messages', id), { content: 'Deleted', type: 'system' });
-              }}
+              onDischarge={archivePatient}
+              onReadmit={readmitPatient} // Added onReadmit
+              onUploadMedia={handleUploadMedia} // Added media upload logic
               onAddMember={async (userId) => {
                 const p = patients.find(x => x.id === selectedPatientId);
                 if (p) await updateDoc(doc(db, 'patients', selectedPatientId), { members: [...p.members, userId] });
@@ -231,16 +267,6 @@ const App: React.FC = () => {
                   setSelectedPatientId(null);
                 }
               }}
-              onGenerateSummary={async (patient, patientMessages) => {
-                const clinicalMessages = patientMessages.filter(m => m.type !== 'system');
-                let log = `CLINICAL LOG - ${patient.surname}\n\n`;
-                clinicalMessages.forEach(m => {
-                  const s = users.find(u => u.id === m.senderId);
-                  log += `[${new Date(m.timestamp).toLocaleString()}] ${s?.firstName}: ${m.content}\n`;
-                });
-                return log;
-              }}
-              users={users}
             />
           )}
           
@@ -250,6 +276,7 @@ const App: React.FC = () => {
           {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
         </div>
 
+        {/* MOBILE NAVIGATION - ONLY SHOWN WHEN NOT IN THREAD */}
         {currentView !== 'thread' && (
           <div className="md:hidden h-16 bg-white dark:bg-viber-dark border-t border-gray-200 dark:border-gray-800 flex justify-around items-center px-2 z-[60] shrink-0">
             <button onClick={() => setCurrentView('chat_list')} className={`p-2 ${currentView === 'chat_list' ? 'text-purple-600' : 'text-gray-400'}`}>
