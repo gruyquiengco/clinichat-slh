@@ -2,15 +2,26 @@ name: Deploy to Firebase Hosting
 on:
   push:
     branches:
-      - main  # Change this to 'master' if your main branch is named master
+      - main
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      
+      # Step 1: Install the "kitchen tools"
+      - name: Install Dependencies
+        run: npm install
+        
+      # Step 2: "Bake" the app (This creates the 'dist' folder!)
+      - name: Build Project
+        run: npm run build
+        
+      # Step 3: Send the 'dist' folder to Firebase
+      - name: Deploy to Firebase
+        uses: FirebaseExtended/action-hosting-deploy@v0
         with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT}}'
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CLINICHAT_SLH }}
           channelId: live
-          projectId: clinichat-slh  # Double-check this matches your Firebase Project ID
+          projectId: clinichat-slh
