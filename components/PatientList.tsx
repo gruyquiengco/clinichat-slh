@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
 import { Patient, UserProfile, UserRole, Message } from '../types';
 import { WARD_OPTIONS } from '../constants';
-import { db } from '../firebase-config';
-import { collection, addDoc, doc, setDoc } from 'firebase/firestore';
 
 interface PatientListProps {
   patients: Patient[];
   messages: Message[];
   onSelect: (id: string) => void;
   currentUser: UserProfile;
-  setPatients: (updater: any) => void;
+  setPatients: (patientData: any) => Promise<void>;
   addAuditLog: (action: any, details: string, targetId: string) => void;
 }
 
@@ -78,8 +76,8 @@ const PatientList: React.FC<PatientListProps> = ({ patients, messages, onSelect,
   const addNewPatient = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const newId = Math.random().toString(36).substr(2, 9);
-    const patientData: Omit<Patient, 'id'> = {
+    
+    const patientData = {
       surname: capitalizeName(formData.get('surname') as string),
       firstName: capitalizeName(formData.get('firstName') as string),
       age: parseInt(formData.get('age') as string) || 0,
@@ -96,13 +94,18 @@ const PatientList: React.FC<PatientListProps> = ({ patients, messages, onSelect,
       chatBg: selectedBg
     };
     
-    // Save to Firestore
-    await setDoc(doc(db, 'patients', newId), patientData);
-    addAuditLog('CREATE', `Added new patient: ${patientData.surname}`, newId);
-    
-    setShowAddModal(false);
-    setSelectedColor(AVATAR_COLORS[0]);
-    setSelectedBg(CHAT_BGS[0]);
+    try {
+      // Calls the centralized save logic in App.tsx
+      await setPatients(patientData);
+      
+      // Reset and Close Modal on success
+      setShowAddModal(false);
+      setSelectedColor(AVATAR_COLORS[0]);
+      setSelectedBg(CHAT_BGS[0]);
+    } catch (error) {
+      console.error("Failed to save patient:", error);
+      alert("Error saving patient. Please check your connection and login status.");
+    }
   };
 
   return (
