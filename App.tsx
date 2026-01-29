@@ -30,6 +30,23 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
+  // Avatar Logic Helpers
+  const getInitials = (fn: string, sn: string) => {
+    const firstPart = fn.split(' ').map(n => n[0]).join('');
+    const lastPart = sn[0];
+    return (firstPart + lastPart).toUpperCase();
+  };
+
+  const getRoleStyle = (role: string) => {
+    switch (role) {
+      case 'ADMIN': return 'bg-red-600 text-white';
+      case 'HCW-MD': return 'bg-blue-600 text-white';
+      case 'HCW-RN': return 'bg-white text-blue-600 border border-blue-100';
+      case 'SYSCLERK': return 'bg-yellow-400 text-black';
+      default: return 'bg-gray-200 text-gray-600';
+    }
+  };
+
   // Real-time Listeners
   useEffect(() => {
     const usersUnsub = onSnapshot(collection(db, 'users'), (snapshot) => {
@@ -124,136 +141,72 @@ const App: React.FC = () => {
     setCurrentView('login');
   };
 
-  const updatePatient = async (updatedPatient: Patient) => {
-    try {
-      const patientRef = doc(db, 'patients', updatedPatient.id);
-      await updateDoc(patientRef, { ...updatedPatient });
-    } catch (e: any) { alert("Update failed: " + e.message); }
-  };
-
-  const archivePatient = async (patientId: string) => {
-    const patientRef = doc(db, 'patients', patientId);
-    await updateDoc(patientRef, { 
-      isArchived: true, 
-      dateDischarged: new Date().toISOString().split('T')[0] 
-    });
-    setCurrentView('chat_list');
-  };
-
-  const readmitPatient = async (patientId: string) => {
-    const patientRef = doc(db, 'patients', patientId);
-    await updateDoc(patientRef, { 
-      isArchived: false, 
-      dateDischarged: null,
-      dateAdmitted: new Date().toISOString().split('T')[0] 
-    });
-  };
-
-  const sendMessage = async (msg: Omit<Message, 'id' | 'timestamp' | 'reactions' | 'readBy'>) => {
-    await addDoc(collection(db, 'messages'), {
-      ...msg,
-      timestamp: new Date().toISOString(),
-      reactions: { check: [], cross: [] },
-      readBy: [currentUser!.id],
-    });
-  };
-
   if (currentView === 'login') {
     return <Login onLogin={handleLogin} onSignUp={handleSignUp} users={users} />;
   }
 
   return (
-    <div className="flex h-screen bg-viber-bg dark:bg-viber-dark relative transition-colors duration-300">
+    <div className="flex h-screen bg-viber-bg dark:bg-viber-dark overflow-hidden transition-colors duration-300">
+      {/* Sidebar - Desktop */}
       <div className="hidden md:block w-80 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-viber-dark">
         <Sidebar currentUser={currentUser!} currentView={currentView} setView={setCurrentView} onLogout={handleLogout} unreadCount={totalUnreadCount} />
       </div>
 
-      {/* Main Content Area with Safe-Padding for Mobile */}
-      <main className="flex-1 flex flex-col relative overflow-hidden bg-viber-bg dark:bg-viber-dark pt-16 md:pt-0 pb-16 md:pb-0">
-        {currentView === 'chat_list' && (
-          <PatientList 
-            patients={patients} 
-            messages={messages} 
-            onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); }} 
-            currentUser={currentUser!} 
-            setPatients={async (newPatientData: any) => {
-              try {
+      <div className="flex-1 flex flex-col relative h-full">
+        {/* --- GLOBAL TOP HEADER (Fixes clipping) --- */}
+        <header className="h-16 md:h-20 bg-white dark:bg-viber-dark border-b border-gray-100 dark:border-gray-800 flex items-center px-6 z-40">
+           <div className="flex flex-col">
+              <h1 className="text-lg font-black text-viber-purple italic leading-none">CliniChat SLH</h1>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+                {currentView.replace('_', ' ')}
+              </p>
+           </div>
+        </header>
+
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-hidden relative bg-viber-bg dark:bg-viber-dark pb-16 md:pb-0">
+          {currentView === 'chat_list' && (
+            <PatientList 
+              patients={patients} 
+              messages={messages} 
+              onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); }} 
+              currentUser={currentUser!} 
+              setPatients={async (newPatientData: any) => {
                 const customId = `PT-${Date.now()}`;
                 const patientRef = doc(db, 'patients', customId);
                 await setDoc(patientRef, { ...newPatientData, id: customId, createdAt: new Date().toISOString() });
                 addAuditLog('CREATE', `New patient added: ${newPatientData.surname}`, customId);
-              } catch (e: any) {
-                alert("DATABASE ERROR: " + e.message);
-                throw e;
-              }
-            }} 
-            addAuditLog={addAuditLog} 
-          />
-        )}
-        
-        {currentView === 'thread' && selectedPatientId && (
-          <ChatThread 
-            patient={patients.find(p => p.id === selectedPatientId)!}
-            messages={messages.filter(m => m.patientId === selectedPatientId)}
-            currentUser={currentUser!}
-            onBack={() => setCurrentView('chat_list')}
-            onSendMessage={sendMessage}
-            onUpdatePatient={updatePatient}
-            onArchive={() => archivePatient(selectedPatientId)}
-            onReadmit={() => readmitPatient(selectedPatientId)}
-            onDeleteMessage={async (id) => {
-              await updateDoc(doc(db, 'messages', id), { content: 'Deleted', type: 'system' });
-            }}
-            onAddMember={async (userId) => {
-              const p = patients.find(x => x.id === selectedPatientId);
-              if (p) await updateDoc(doc(db, 'patients', selectedPatientId), { members: [...p.members, userId] });
-            }}
-            onLeaveThread={async () => {
-              const p = patients.find(x => x.id === selectedPatientId);
-              if (p) {
-                await updateDoc(doc(db, 'patients', selectedPatientId), { members: p.members.filter(id => id !== currentUser!.id) });
-                setCurrentView('chat_list');
-              }
-            }}
-            onGenerateSummary={async (patient, patientMessages) => {
-              const clinicalMessages = patientMessages.filter(m => m.type !== 'system');
-              let log = `CLINICAL LOG - ${patient.surname}\n\n`;
-              clinicalMessages.forEach(m => {
-                const s = users.find(u => u.id === m.senderId);
-                log += `[${new Date(m.timestamp).toLocaleString()}] ${s?.firstName}: ${m.content}\n`;
-              });
-              return log;
-            }}
-            users={users}
-          />
-        )}
-        
-        {currentView === 'contacts' && <Contacts users={users} onBack={() => setCurrentView('chat_list')} currentUser={currentUser!} onDeleteHCW={() => {}} onAddUser={() => {}} onUpdateUser={() => {}} />}
-        {currentView === 'profile' && <UserProfileView user={currentUser!} onSave={async (u) => { setCurrentUser(u); await updateDoc(doc(db, 'users', u.id), { ...u }); }} onBack={() => setCurrentView('chat_list')} onLogout={handleLogout} />}
-        {currentView === 'audit' && currentUser?.role === UserRole.ADMIN && <AuditTrail logs={auditLogs} users={users} onBack={() => setCurrentView('chat_list')} />}
-        {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
-
-        {/* Mobile Navigation Bar */}
-        <div className="md:hidden absolute bottom-0 left-0 right-0 h-16 bg-white dark:bg-gray-900 border-t border-gray-200 flex justify-around items-center px-2 z-[60]">
-          <button onClick={() => setCurrentView('chat_list')} className={`p-2 ${currentView === 'chat_list' ? 'text-purple-600' : 'text-gray-400'}`}>
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
-          </button>
+              }} 
+              addAuditLog={addAuditLog} 
+            />
+          )}
           
-          <button onClick={() => setCurrentView('contacts')} className={`p-2 ${currentView === 'contacts' ? 'text-purple-600' : 'text-gray-400'}`}>
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-          </button>
+          {currentView === 'contacts' && <Contacts users={users} onBack={() => setCurrentView('chat_list')} currentUser={currentUser!} onDeleteHCW={() => {}} onAddUser={() => {}} onUpdateUser={() => {}} />}
+          
+          {currentView === 'profile' && <UserProfileView user={currentUser!} onSave={async (u) => { setCurrentUser(u); await updateDoc(doc(db, 'users', u.id), { ...u }); }} onBack={() => setCurrentView('chat_list')} onLogout={handleLogout} />}
+          
+          {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
 
-          <button onClick={() => setCurrentView('reports')} className={`p-2 ${currentView === 'reports' ? 'text-purple-600' : 'text-gray-400'}`}>
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-          </button>
+          {/* Mobile Navigation Bar */}
+          <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white dark:bg-gray-900 border-t border-gray-200 flex justify-around items-center z-50">
+            <button onClick={() => setCurrentView('chat_list')} className={`p-2 ${currentView === 'chat_list' ? 'text-viber-purple' : 'text-gray-400'}`}>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+            </button>
+            <button onClick={() => setCurrentView('contacts')} className={`p-2 ${currentView === 'contacts' ? 'text-viber-purple' : 'text-gray-400'}`}>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+            </button>
+            <button onClick={() => setCurrentView('reports')} className={`p-2 ${currentView === 'reports' ? 'text-viber-purple' : 'text-gray-400'}`}>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            </button>
+            <button onClick={() => setCurrentView('profile')} className={`p-1 rounded-full border-2 ${currentView === 'profile' ? 'border-viber-purple' : 'border-transparent'}`}>
+               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[8px] font-black ${getRoleStyle(currentUser.role)}`}>
+                  {getInitials(currentUser.firstName, currentUser.surname)}
+               </div>
+            </button>
+          </nav>
+        </main>
+      </div>
 
-          <button onClick={() => setCurrentView('profile')} className={`p-0.5 rounded-full border-2 ${currentView === 'profile' ? 'border-purple-600' : 'border-transparent'}`}>
-            <img src={currentUser?.photo} className="w-8 h-8 rounded-full object-cover" alt="Profile" />
-          </button>
-        </div>
-      </main>
-
-      {/* Repositioned Compliance Tag */}
       <div className="fixed bottom-20 right-2 bg-gray-900/80 text-white text-[8px] px-2 py-1 rounded-md z-[100] font-bold shadow-lg">SLH-MC DPA 2012 COMPLIANT</div>
     </div>
   );
