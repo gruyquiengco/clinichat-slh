@@ -131,31 +131,30 @@ const App: React.FC = () => {
     } catch (e: any) { alert("Update failed: " + e.message); }
   };
 
-  // RESTORED: Discharge Patient Logic
   const archivePatient = async (patientId: string) => {
     try {
       const patientRef = doc(db, 'patients', patientId);
       await updateDoc(patientRef, { 
         isArchived: true, 
-        dateDischarged: new Date().toISOString()
+        dateDischarged: new Date().toISOString().split('T')[0]
       });
       addAuditLog('UPDATE', `Patient successfully discharged/archived`, patientId);
       setCurrentView('chat_list');
+      setSelectedPatientId(null);
     } catch (e: any) { alert("Discharge failed: " + e.message); }
   };
 
-  // RESTORED: Readmit Patient Logic (Resets Care Team)
-  const readmitPatient = async (patientId: string) => {
+  const readmitPatient = async (patient: Patient) => {
     try {
-      const patientRef = doc(db, 'patients', patientId);
+      const patientRef = doc(db, 'patients', patient.id);
       await updateDoc(patientRef, { 
         isArchived: false, 
         dateDischarged: null,
         dateAdmitted: new Date().toISOString().split('T')[0],
-        members: [] // Clear previous care team for new admission
+        members: [currentUser!.id] // Add readmitting HCW as first care team member
       });
-      addAuditLog('UPDATE', `Patient readmitted - care team cleared for reassignment`, patientId);
-      alert("Patient has been readmitted. Please assign a new care team.");
+      addAuditLog('UPDATE', `Patient readmitted: ${patient.surname}`, patient.id);
+      alert("Patient has been readmitted to Active list.");
     } catch (e: any) { alert("Readmission failed: " + e.message); }
   };
 
@@ -192,7 +191,7 @@ const App: React.FC = () => {
               messages={messages} 
               onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); }} 
               currentUser={currentUser!} 
-              onReadmit={readmitPatient} // Passing readmit to list
+              onReadmit={readmitPatient} 
               setPatients={async (newPatientData: any) => {
                 try {
                   const customId = `PT-${Date.now()}`;
@@ -213,11 +212,10 @@ const App: React.FC = () => {
               patient={patients.find(p => p.id === selectedPatientId)!}
               messages={messages.filter(m => m.patientId === selectedPatientId)}
               currentUser={currentUser!}
-              onBack={() => setCurrentView('chat_list')}
+              onBack={() => { setCurrentView('chat_list'); setSelectedPatientId(null); }}
               onSendMessage={sendMessage}
               onUpdatePatient={updatePatient}
-              onArchive={() => archivePatient(selectedPatientId)}
-              onReadmit={() => readmitPatient(selectedPatientId)}
+              onDischarge={archivePatient} // Mapped onDischarge to archivePatient function
               onDeleteMessage={async (id) => {
                 await updateDoc(doc(db, 'messages', id), { content: 'Deleted', type: 'system' });
               }}
@@ -230,6 +228,7 @@ const App: React.FC = () => {
                 if (p) {
                   await updateDoc(doc(db, 'patients', selectedPatientId), { members: p.members.filter(id => id !== currentUser!.id) });
                   setCurrentView('chat_list');
+                  setSelectedPatientId(null);
                 }
               }}
               onGenerateSummary={async (patient, patientMessages) => {
