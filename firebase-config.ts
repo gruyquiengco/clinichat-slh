@@ -1,9 +1,9 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
-// REPLACE THE VALUES BELOW WITH YOUR FIREBASE PROJECT CONFIG
+// Your existing Firebase project config
 const firebaseConfig = {
- apiKey: "AIzaSyAVDlpJswapXPm-bdmhMee6d1zEA73l63U",
+  apiKey: "AIzaSyAVDlpJswapXPm-bdmhMee6d1zEA73l63U",
   authDomain: "clinichat-slh.firebaseapp.com",
   projectId: "clinichat-slh",
   storageBucket: "clinichat-slh.firebasestorage.app",
@@ -12,5 +12,9 @@ const firebaseConfig = {
   measurementId: "G-JTVRF4YT1F"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// Initialize Firestore and explicitly point to the 'clinchat-slh' database
+// This fixes the "Missing or insufficient permissions" error
+export const db = getFirestore(app, "clinchat-slh");
