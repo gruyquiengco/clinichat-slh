@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserProfile } from '../types';
+import { UserProfile, UserRole } from '../types';
 
 interface UserProfileProps {
   user: UserProfile;
@@ -12,6 +12,17 @@ const UserProfileView: React.FC<UserProfileProps> = ({ user, onSave, onBack, onL
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(user);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Department List
+  const departments = [
+    "Surgery",
+    "Internal Medicine",
+    "Adult IDS",
+    "Pediatrics",
+    "OB-Gyne",
+    "Anesthesia",
+    "Nursing"
+  ];
 
   const getInitials = (fn: string, sn: string) => {
     const firstPart = fn.split(' ').map(n => n[0]).join('');
@@ -35,6 +46,9 @@ const UserProfileView: React.FC<UserProfileProps> = ({ user, onSave, onBack, onL
     alert("Profile successfully updated.");
   };
 
+  // Only Admins can change roles
+  const canEditRole = user.role === UserRole.ADMIN;
+
   return (
     <div className="flex-1 flex flex-col h-full bg-viber-bg dark:bg-viber-dark transition-colors">
       <div className="p-4 bg-white dark:bg-viber-dark border-b border-gray-200 dark:border-gray-800 flex items-center gap-4 sticky top-0 z-10">
@@ -56,14 +70,41 @@ const UserProfileView: React.FC<UserProfileProps> = ({ user, onSave, onBack, onL
         </div>
 
         <div className="max-w-md mx-auto space-y-4 bg-white dark:bg-gray-900 p-6 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-gray-800">
+          
+          {/* Role Assignment - Only Editable by Admin */}
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Account Role</label>
+            <select 
+              disabled={!isEditing || !canEditRole} 
+              value={formData.role} 
+              onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})} 
+              className={`w-full mt-1 p-3 rounded-xl border-none text-sm transition-all appearance-none ${isEditing && canEditRole ? 'bg-purple-50 dark:bg-purple-900/20 ring-1 ring-purple-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800/50 dark:text-gray-400 opacity-70 cursor-not-allowed'}`}
+            >
+              <option value={UserRole.HCW_MD}>HCW-MD</option>
+              <option value={UserRole.HCW_RN}>HCW-RN</option>
+              <option value={UserRole.SYSCLERK}>SYSCLERK</option>
+              <option value={UserRole.ADMIN}>ADMIN</option>
+            </select>
+            {!canEditRole && isEditing && <p className="text-[9px] text-red-400 mt-1 ml-1">* Contact Admin to change roles</p>}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Employee ID</label>
               <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl text-gray-600 dark:text-gray-400 text-sm font-mono">{user.employeeId || 'NOT SET'}</div>
             </div>
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Email</label>
-              <div className="mt-1 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-xl text-gray-600 dark:text-gray-400 text-sm truncate">{user.email}</div>
+              <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Department</label>
+              <select 
+                disabled={!isEditing} 
+                value={formData.department} 
+                onChange={(e) => setFormData({...formData, department: e.target.value})} 
+                className={`w-full mt-1 p-3 rounded-xl border-none text-sm transition-all ${isEditing ? 'bg-purple-50 dark:bg-purple-900/20 ring-1 ring-purple-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800/50 dark:text-gray-300'}`}
+              >
+                {departments.map(dept => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -79,8 +120,8 @@ const UserProfileView: React.FC<UserProfileProps> = ({ user, onSave, onBack, onL
           </div>
 
           <div>
-            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Specialization</label>
-            <input disabled={!isEditing} value={formData.specialization || ''} onChange={(e) => setFormData({...formData, specialization: e.target.value})} className={`w-full mt-1 p-3 rounded-xl border-none text-sm transition-all ${isEditing ? 'bg-purple-50 dark:bg-purple-900/20 ring-1 ring-purple-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800/50 dark:text-gray-300'}`} />
+            <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Designation / Specialization</label>
+            <input placeholder="e.g. Cardiologist" disabled={!isEditing} value={formData.specialization || ''} onChange={(e) => setFormData({...formData, specialization: e.target.value})} className={`w-full mt-1 p-3 rounded-xl border-none text-sm transition-all ${isEditing ? 'bg-purple-50 dark:bg-purple-900/20 ring-1 ring-purple-500 dark:text-white' : 'bg-gray-50 dark:bg-gray-800/50 dark:text-gray-300'}`} />
           </div>
 
           <div>
