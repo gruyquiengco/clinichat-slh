@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+// Verify this path: use '../types' if this file is in a 'components' folder
 import { Patient, UserProfile, UserRole, Message } from '../types';
 import { WARD_OPTIONS } from '../constants';
 
@@ -17,8 +18,8 @@ const CHAT_BGS = ['#F2F2F7', '#E5E5EA', '#FFF5F5', '#F0FFF4', '#EBF8FF', '#11182
 type SortOption = 'alphabetical' | 'dateAdmitted' | 'ward' | 'age' | 'roomNumber';
 
 const PatientList: React.FC<PatientListProps> = ({ 
-  patients = [], // Guard: default to empty array
-  messages = [], // Guard: default to empty array
+  patients = [], 
+  messages = [], 
   onSelect, 
   onReadmit, 
   currentUser, 
@@ -33,8 +34,7 @@ const PatientList: React.FC<PatientListProps> = ({
   const [selectedBg, setSelectedBg] = useState(CHAT_BGS[0]);
   const [patientToReadmit, setPatientToReadmit] = useState<Patient | null>(null);
 
-  // Safety check: if currentUser is missing, don't render the list logic
-  if (!currentUser) return null;
+  if (!currentUser) return <div className="p-10 text-center font-bold">Authenticating...</div>;
 
   const capitalizeName = (str: string) => 
     str ? str.trim().split(/\s+/).map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ') : '';
@@ -46,21 +46,16 @@ const PatientList: React.FC<PatientListProps> = ({
     if (!ts) return '';
     try {
       const date = new Date(ts);
-      return date.toLocaleString('en-US', { 
-        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true 
-      });
+      return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
     } catch (e) { return ''; }
   };
 
-  // Filter with null checks
-  const filteredPatients = (patients || []).filter(p => {
-    const isArchiveMatch = p.isArchived === (activeTab === 'discharged');
-    const matchesSearch = 
-      p.surname?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      p.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      p.patientId?.toLowerCase().includes(searchTerm.toLowerCase());
-    return isArchiveMatch && matchesSearch;
-  });
+  const filteredPatients = patients.filter(p => 
+    p.isArchived === (activeTab === 'discharged') && 
+    (p.surname?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+     p.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+     p.patientId?.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
   const sortedPatients = [...filteredPatients].sort((a, b) => {
     switch (sortBy) {
@@ -118,78 +113,34 @@ const PatientList: React.FC<PatientListProps> = ({
         <button onClick={() => setActiveTab('discharged')} className={`flex-1 py-3 text-xs font-black uppercase tracking-widest border-b-2 transition-colors ${activeTab === 'discharged' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-400'}`}>Discharged</button>
       </div>
 
-      {/* Search & Sort */}
-      <div className="p-4 space-y-3 shrink-0">
-        <div className="relative">
-          <input type="text" placeholder="Search by name or ID..." className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-gray-800 dark:text-gray-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-purple-500" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-          <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Sort:</span>
-          <select className="bg-gray-100 dark:bg-gray-800 dark:text-gray-300 text-[10px] font-bold py-1 px-3 rounded-full border-none outline-none uppercase" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)}>
-            <option value="alphabetical">Surname</option>
-            <option value="dateAdmitted">Admission</option>
-            <option value="ward">Ward</option>
-            <option value="age">Age</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Patient List */}
+      {/* List */}
       <div className="flex-1 overflow-y-auto">
         {sortedPatients.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-gray-400">
-            <p className="text-xs font-bold uppercase tracking-widest">No records found</p>
+          <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+            <p className="text-xs font-bold uppercase tracking-widest">No Clinical Records Found</p>
           </div>
         ) : (
           sortedPatients.map(patient => {
-            const patientMessages = (messages || []).filter(m => m.patientId === patient.id && m.type !== 'system');
+            const patientMessages = messages.filter(m => m.patientId === patient.id);
             const lastMsg = patientMessages[patientMessages.length - 1];
-            const unreadCount = patientMessages.filter(m => !(m.readBy || []).includes(currentUser.id)).length;
-            
             return (
-              <button key={patient.id} onClick={() => onSelect(patient.id)} className="w-full flex items-center gap-4 p-4 border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-all text-left">
-                <div className="relative shrink-0">
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-[11px] shadow-sm" style={{ backgroundColor: patient.avatarColor || '#7360f2' }}>
-                    {getInitials(patient)}
-                  </div>
-                  {unreadCount > 0 && !patient.isArchived && (
-                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-black border-2 border-white dark:border-gray-900 shadow-sm">
-                      {unreadCount}
-                    </div>
-                  )}
+              <button key={patient.id} onClick={() => onSelect(patient.id)} className="w-full flex items-center gap-4 p-4 border-b border-gray-50 dark:border-gray-800/50 text-left">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center font-black text-white text-[11px]" style={{ backgroundColor: patient.avatarColor || '#7360f2' }}>
+                  {getInitials(patient)}
                 </div>
-
                 <div className="flex-1 min-w-0">
-                  <div className="flex justify-between items-baseline mb-0.5">
-                    <h3 className={`truncate text-sm uppercase tracking-tight ${unreadCount > 0 ? 'font-black text-black dark:text-white' : 'font-bold text-gray-700 dark:text-gray-200'}`}>
-                      {patient.surname}, {patient.firstName}
-                    </h3>
-                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter whitespace-nowrap ml-2">
-                      {lastMsg ? formatDateTime(lastMsg.timestamp) : (patient.isArchived ? `D: ${patient.dateDischarged}` : `A: ${patient.dateAdmitted}`)}
-                    </span>
-                  </div>
-                  <p className="text-[10px] font-bold text-purple-600 uppercase tracking-tighter mb-1">
-                    {patient.ward}-{patient.roomNumber} • {patient.diagnosis}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 truncate italic">
-                    {lastMsg?.content || 'No clinical entries yet...'}
-                  </p>
+                    <h3 className="truncate text-sm font-bold uppercase text-gray-800 dark:text-white">{patient.surname}, {patient.firstName}</h3>
+                    <p className="text-[10px] font-bold text-purple-600 uppercase">{patient.ward}-{patient.roomNumber}</p>
+                    <p className="text-xs text-gray-400 truncate italic">{lastMsg?.content || 'Started clinical thread...'}</p>
                 </div>
-
-                {patient.isArchived && canEditClinical && (
-                  <div onClick={(e) => { e.stopPropagation(); setPatientToReadmit(patient); }} className="bg-emerald-500 text-white text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-widest shadow-sm">
-                    Readmit
-                  </div>
-                )}
               </button>
             );
           })
         )}
       </div>
 
-      {/* Modals remain same as your logic... */}
-      {/* [ADD PATIENT MODAL AND READMIT MODAL CODE FROM YOUR FILE] */}
+      {/* Modals (Ensure you have your Modal code below) */}
+      {/* ... Add Patient Modal Code ... */}
     </div>
   );
 };
