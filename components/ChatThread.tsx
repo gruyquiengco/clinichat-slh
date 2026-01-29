@@ -642,4 +642,44 @@ const ChatThread: React.FC<ChatThreadProps> = ({
             </div>
 
             <div className="p-4">
-              <button onClick={() => setSelectedMemberContact(null)} className="w-full py-3 text-xs 
+              <button onClick={() => setSelectedMemberContact(null)} className="w-full py-3 text-xs font-black text-gray-400 uppercase hover:text-gray-600 transition-colors">Dismiss</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Member Modal */}
+      {showAddMember && (
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/80 z-[300] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-gray-900 rounded-[2.5rem] w-full max-sm overflow-hidden shadow-2xl transition-colors">
+            <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between">
+              <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tighter">Add Participant</h4>
+              <button onClick={() => setShowAddMember(false)} className="p-2 text-gray-400 hover:text-gray-600"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            <div className="max-h-96 overflow-y-auto p-4 space-y-2">
+               {users.filter(u => !patient.members.includes(u.id)).map(user => (
+                  <button 
+                    key={user.id} 
+                    onClick={() => { onAddMember(user.id); setShowAddMember(false); }}
+                    className="w-full flex items-center gap-3 p-3 hover:bg-purple-50 dark:hover:bg-purple-900/10 rounded-2xl transition-all group"
+                  >
+                    <img src={user.photo} className="w-10 h-10 rounded-full" alt="" />
+                    <div className="text-left flex-1">
+                      <p className="text-sm font-bold text-gray-900 dark:text-white">{user.firstName} {user.surname}</p>
+                      <p className="text-[10px] text-gray-400 uppercase">{user.specialization}</p>
+                    </div>
+                    <svg className="w-5 h-5 text-gray-300 group-hover:text-purple-600 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                  </button>
+               ))}
+               {users.filter(u => !patient.members.includes(u.id)).length === 0 && (
+                 <p className="text-center py-8 text-xs text-gray-400 font-bold uppercase">All registered staff are already in this thread.</p>
+               )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ChatThread;
