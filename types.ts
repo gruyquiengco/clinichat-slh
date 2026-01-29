@@ -1,7 +1,8 @@
 export enum UserRole {
-  ADMIN = 'database admin',
-  HCW = 'HCW',
-  SYSCLERK = 'sysclerk'
+  ADMIN = 'ADMIN',
+  HCW_MD = 'HCW-MD',
+  HCW_RN = 'HCW-RN',
+  SYSCLERK = 'SYSCLERK',
 }
 
 export interface UserProfile {
