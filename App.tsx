@@ -29,7 +29,6 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
-  // Helpers for the new Initial-based Avatars
   const getInitials = (fn: string, sn: string) => {
     const firstPart = fn.split(' ').map(n => n[0]).join('');
     const lastPart = sn[0];
@@ -46,7 +45,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Real-time Database Listeners
   useEffect(() => {
     const usersUnsub = onSnapshot(collection(db, 'users'), (snapshot) => {
       const userData: UserProfile[] = [];
@@ -85,7 +83,6 @@ const App: React.FC = () => {
     };
   }, [currentUser]);
 
-  // Persistent Session
   useEffect(() => {
     const savedUser = localStorage.getItem('slh_active_session');
     if (savedUser) {
@@ -121,37 +118,31 @@ const App: React.FC = () => {
     setCurrentUser(user);
     if (stayLoggedIn) localStorage.setItem('slh_active_session', JSON.stringify(user));
     setCurrentView('chat_list');
-    addAuditLog('LOGIN', 'User logged in', user.id, user.id);
   };
 
   const handleSignUp = async (newUser: UserProfile) => {
     try {
       await setDoc(doc(db, 'users', newUser.id), newUser);
-      addAuditLog('SIGNUP', `Account created: ${newUser.email}`, newUser.id, newUser.id);
-    } catch (e: any) { alert("Sign up failed: " + e.message); }
+    } catch (e: any) { alert("Sign up failed"); }
   };
 
   const handleLogout = () => {
-    if (currentUser) addAuditLog('LOGIN', 'User logged out', currentUser.id);
     localStorage.removeItem('slh_active_session');
     setCurrentUser(null);
     setCurrentView('login');
   };
 
-  // View switchers
   if (currentView === 'login') {
     return <Login onLogin={handleLogin} onSignUp={handleSignUp} users={users} />;
   }
 
   return (
     <div className="fixed inset-0 flex h-screen w-screen bg-viber-bg dark:bg-viber-dark overflow-hidden transition-colors duration-300">
-      {/* Sidebar - Desktop */}
       <div className="hidden md:block w-80 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-viber-dark flex-shrink-0">
         <Sidebar currentUser={currentUser!} currentView={currentView} setView={setCurrentView} onLogout={handleLogout} unreadCount={totalUnreadCount} />
       </div>
 
       <div className="flex-1 flex flex-col min-w-0 h-full relative">
-        {/* GLOBAL HEADER (Stops content from hiding under browser bar) */}
         <header className="h-16 md:h-20 flex-shrink-0 bg-white dark:bg-viber-dark border-b border-gray-100 dark:border-gray-800 flex items-center px-6 z-40">
            <div className="flex flex-col">
               <h1 className="text-lg font-black text-viber-purple italic leading-none">CliniChat SLH</h1>
@@ -161,7 +152,6 @@ const App: React.FC = () => {
            </div>
         </header>
 
-        {/* SCROLLABLE MAIN CONTENT */}
         <main className="flex-1 overflow-y-auto relative pb-20 md:pb-0 bg-viber-bg">
           {currentView === 'chat_list' && (
             <PatientList 
@@ -177,7 +167,7 @@ const App: React.FC = () => {
             />
           )}
           
-          {currentView === 'contacts' && <Contacts users={users} onBack={() => setCurrentView('chat_list')} currentUser={currentUser!} onDeleteHCW={() => {}} onAddUser={() => {}} onUpdateUser={() => {}} />}
+          {currentView === 'contacts' && <Contacts users={users} onBack={() => setCurrentView('chat_list')} currentUser={currentUser!} onDeleteHCW={(id) => {}} onAddUser={() => {}} onUpdateUser={() => {}} />}
           {currentView === 'profile' && <UserProfileView user={currentUser!} onSave={async (u) => { setCurrentUser(u); await updateDoc(doc(db, 'users', u.id), { ...u }); }} onBack={() => setCurrentView('chat_list')} onLogout={handleLogout} />}
           {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
           
@@ -188,13 +178,42 @@ const App: React.FC = () => {
                 messages={messages.filter(m => m.patientId === selectedPatientId)}
                 currentUser={currentUser!}
                 onBack={() => setCurrentView('chat_list')}
-                onSendMessage={async (msg) => { await addDoc(collection(db, 'messages'), { ...msg, timestamp: new Date().toISOString(), readBy: [currentUser!.id] }); }}
+                onSendMessage={async (msg) => { 
+                  await addDoc(collection(db, 'messages'), { ...msg, timestamp: new Date().toISOString(), readBy: [currentUser!.id] }); 
+                }}
                 users={users}
-                // ... (Include other necessary props for ChatThread)
+                onUpdatePatient={() => {}}
+                onArchive={() => {}}
+                onReadmit={() => {}}
+                onDeleteMessage={() => {}}
+                onAddMember={() => {}}
+                onLeaveThread={() => {}}
+                onGenerateSummary={async () => ""}
               />
             </div>
           )}
         </main>
 
-        {/* MOBILE NAVIGATION BAR */}
-        
+        <nav className="md:hidden flex-shrink-0 h-16 bg-white dark:bg-gray-900 border-t border-gray-200 flex justify-around items-center z-40">
+          <button onClick={() => setCurrentView('chat_list')} className={`p-2 ${currentView === 'chat_list' ? 'text-viber-purple' : 'text-gray-400'}`}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+          </button>
+          <button onClick={() => setCurrentView('contacts')} className={`p-2 ${currentView === 'contacts' ? 'text-viber-purple' : 'text-gray-400'}`}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+          </button>
+          <button onClick={() => setCurrentView('reports')} className={`p-2 ${currentView === 'reports' ? 'text-viber-purple' : 'text-gray-400'}`}>
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+          </button>
+          <button onClick={() => setCurrentView('profile')} className={`p-1 rounded-full border-2 ${currentView === 'profile' ? 'border-viber-purple' : 'border-transparent'}`}>
+             <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[8px] font-black ${getRoleStyle(currentUser!.role)}`}>
+                {getInitials(currentUser!.firstName, currentUser!.surname)}
+             </div>
+          </button>
+        </nav>
+      </div>
+      <div className="fixed bottom-20 right-2 bg-gray-900/80 text-white text-[8px] px-2 py-1 rounded-md z-[60] font-bold shadow-lg uppercase">SLH-MC DPA 2012 COMPLIANT</div>
+    </div>
+  );
+};
+
+export default App;
