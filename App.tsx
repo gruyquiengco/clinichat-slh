@@ -131,22 +131,32 @@ const App: React.FC = () => {
     } catch (e: any) { alert("Update failed: " + e.message); }
   };
 
+  // RESTORED: Discharge Patient Logic
   const archivePatient = async (patientId: string) => {
-    const patientRef = doc(db, 'patients', patientId);
-    await updateDoc(patientRef, { 
-      isArchived: true, 
-      dateDischarged: new Date().toISOString().split('T')[0] 
-    });
-    setCurrentView('chat_list');
+    try {
+      const patientRef = doc(db, 'patients', patientId);
+      await updateDoc(patientRef, { 
+        isArchived: true, 
+        dateDischarged: new Date().toISOString()
+      });
+      addAuditLog('UPDATE', `Patient successfully discharged/archived`, patientId);
+      setCurrentView('chat_list');
+    } catch (e: any) { alert("Discharge failed: " + e.message); }
   };
 
+  // RESTORED: Readmit Patient Logic (Resets Care Team)
   const readmitPatient = async (patientId: string) => {
-    const patientRef = doc(db, 'patients', patientId);
-    await updateDoc(patientRef, { 
-      isArchived: false, 
-      dateDischarged: null,
-      dateAdmitted: new Date().toISOString().split('T')[0] 
-    });
+    try {
+      const patientRef = doc(db, 'patients', patientId);
+      await updateDoc(patientRef, { 
+        isArchived: false, 
+        dateDischarged: null,
+        dateAdmitted: new Date().toISOString().split('T')[0],
+        members: [] // Clear previous care team for new admission
+      });
+      addAuditLog('UPDATE', `Patient readmitted - care team cleared for reassignment`, patientId);
+      alert("Patient has been readmitted. Please assign a new care team.");
+    } catch (e: any) { alert("Readmission failed: " + e.message); }
   };
 
   const sendMessage = async (msg: Omit<Message, 'id' | 'timestamp' | 'reactions' | 'readBy'>) => {
@@ -164,7 +174,6 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full bg-viber-bg dark:bg-viber-dark overflow-hidden fixed inset-0">
-      {/* Sidebar for Desktop - Flex-Col and H-Full ensures profile stays visible at bottom */}
       <div className="hidden md:flex flex-col w-80 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-viber-dark h-full shrink-0">
         <Sidebar 
           currentUser={currentUser!} 
@@ -175,7 +184,6 @@ const App: React.FC = () => {
         />
       </div>
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full relative overflow-hidden">
         <div className="flex-1 h-full overflow-hidden flex flex-col">
           {currentView === 'chat_list' && (
@@ -184,6 +192,7 @@ const App: React.FC = () => {
               messages={messages} 
               onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); }} 
               currentUser={currentUser!} 
+              onReadmit={readmitPatient} // Passing readmit to list
               setPatients={async (newPatientData: any) => {
                 try {
                   const customId = `PT-${Date.now()}`;
@@ -242,7 +251,6 @@ const App: React.FC = () => {
           {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
         </div>
 
-        {/* Mobile Navigation Bar */}
         {currentView !== 'thread' && (
           <div className="md:hidden h-16 bg-white dark:bg-viber-dark border-t border-gray-200 dark:border-gray-800 flex justify-around items-center px-2 z-[60] shrink-0">
             <button onClick={() => setCurrentView('chat_list')} className={`p-2 ${currentView === 'chat_list' ? 'text-purple-600' : 'text-gray-400'}`}>
@@ -261,7 +269,6 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Compliance Tag */}
       {currentView !== 'thread' && (
         <div className="fixed bottom-20 right-2 bg-gray-900/80 text-white text-[8px] px-2 py-1 rounded-md z-[100] font-bold shadow-lg pointer-events-none">
           SLH-MC DPA 2012 COMPLIANT
