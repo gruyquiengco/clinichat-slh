@@ -164,9 +164,15 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen w-full bg-viber-bg dark:bg-viber-dark overflow-hidden fixed inset-0">
-      {/* Sidebar for Desktop */}
-      <div className="hidden md:block w-80 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-viber-dark h-full">
-        <Sidebar currentUser={currentUser!} currentView={currentView} setView={setCurrentView} onLogout={handleLogout} unreadCount={totalUnreadCount} />
+      {/* Sidebar for Desktop - Flex-Col and H-Full ensures profile stays visible at bottom */}
+      <div className="hidden md:flex flex-col w-80 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-viber-dark h-full shrink-0">
+        <Sidebar 
+          currentUser={currentUser!} 
+          currentView={currentView} 
+          setView={setCurrentView} 
+          onLogout={handleLogout} 
+          unreadCount={totalUnreadCount} 
+        />
       </div>
 
       {/* Main Content Area */}
@@ -236,21 +242,18 @@ const App: React.FC = () => {
           {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
         </div>
 
-        {/* Mobile Navigation Bar - Only show when NOT in a thread to maximize chat space */}
+        {/* Mobile Navigation Bar */}
         {currentView !== 'thread' && (
           <div className="md:hidden h-16 bg-white dark:bg-viber-dark border-t border-gray-200 dark:border-gray-800 flex justify-around items-center px-2 z-[60] shrink-0">
             <button onClick={() => setCurrentView('chat_list')} className={`p-2 ${currentView === 'chat_list' ? 'text-purple-600' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
             </button>
-            
             <button onClick={() => setCurrentView('contacts')} className={`p-2 ${currentView === 'contacts' ? 'text-purple-600' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
             </button>
-
             <button onClick={() => setCurrentView('reports')} className={`p-2 ${currentView === 'reports' ? 'text-purple-600' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
             </button>
-
             <button onClick={() => setCurrentView('profile')} className={`p-0.5 rounded-full border-2 ${currentView === 'profile' ? 'border-purple-600' : 'border-transparent'}`}>
               <img src={currentUser?.photo} className="w-8 h-8 rounded-full object-cover shadow-sm" alt="Profile" />
             </button>
@@ -258,7 +261,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Repositioned Compliance Tag - Hidden in active thread to avoid clutter */}
+      {/* Compliance Tag */}
       {currentView !== 'thread' && (
         <div className="fixed bottom-20 right-2 bg-gray-900/80 text-white text-[8px] px-2 py-1 rounded-md z-[100] font-bold shadow-lg pointer-events-none">
           SLH-MC DPA 2012 COMPLIANT
