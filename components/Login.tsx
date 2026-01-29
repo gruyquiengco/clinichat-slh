@@ -26,12 +26,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSignUp, users }) => {
     setError('');
     setSuccess('');
 
+    const lowerEmail = email.toLowerCase().trim();
+
     if (view === 'signup') {
-      if (!email || !password || !firstName || !surname) {
+      if (!lowerEmail || !password || !firstName || !surname) {
         setError('All fields are mandatory for account registration.');
         return;
       }
-      if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
+      if (users.some(u => u.email.toLowerCase() === lowerEmail)) {
         setError('This email is already registered in the SLH database.');
         return;
       }
@@ -39,40 +41,43 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSignUp, users }) => {
         id: Math.random().toString(36).substr(2, 9),
         firstName,
         surname,
-        email,
+        email: lowerEmail,
         password,
         role,
         specialization: role === UserRole.HCW ? 'Medical Staff' : 'Administrative Staff',
         department: 'General',
         phone: '09XX-XXX-XXXX',
-        photo: `https://i.pravatar.cc/150?u=${email}`
+        photo: `https://i.pravatar.cc/150?u=${lowerEmail}`
       };
       onSignUp(newUser);
       setSuccess('Account created successfully! You may now log in.');
       setView('login');
       setPassword('');
     } else if (view === 'login') {
-      if (!email || !password) {
+      if (!lowerEmail || !password) {
         setError('Please enter both your hospital email and password.');
         return;
       }
-      const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+
+      // We find the user from the global 'users' list provided by Firebase via App.tsx
+      const user = users.find(u => u.email.toLowerCase() === lowerEmail && u.password === password);
+      
       if (user) {
         onLogin(user, stayLoggedIn);
       } else {
-        const emailExists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
+        const emailExists = users.some(u => u.email.toLowerCase() === lowerEmail);
         if (emailExists) {
-          setError('Incorrect password. Please try again or use "Forgot Password".');
+          setError('Incorrect password. Please try again.');
         } else {
-          setError('Email not found. Please verify your credentials or contact IT.');
+          setError('Email not found in the hospital registry.');
         }
       }
     } else if (view === 'forgot') {
-      if (!email || !email.includes('@')) {
+      if (!lowerEmail || !lowerEmail.includes('@')) {
         setError('Please enter a valid hospital email address.');
         return;
       }
-      setSuccess('Password reset instructions have been sent to your hospital email.');
+      setSuccess('Recovery instructions sent to ' + lowerEmail);
       setView('login');
     }
   };
