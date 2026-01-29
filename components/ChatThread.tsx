@@ -150,31 +150,31 @@ const ChatThread: React.FC<ChatThreadProps> = ({
   return (
     <div className="flex-1 flex flex-col h-full bg-white dark:bg-viber-dark transition-colors overflow-hidden">
       {/* Header */}
-      <div className="p-3 bg-white dark:bg-viber-dark border-b border-gray-200 dark:border-gray-800 flex items-center justify-between shadow-sm z-20">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <button onClick={onBack} className="md:hidden text-gray-500 hover:text-purple-600 transition-colors">
+      <div className="h-14 bg-white dark:bg-viber-dark border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-3 shadow-sm z-20 shrink-0">
+        <div className="flex items-center gap-2 overflow-hidden">
+          <button onClick={onBack} className="md:hidden p-1 -ml-1 text-gray-500 hover:text-purple-600 transition-colors shrink-0">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
           </button>
           <div 
-            className="w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center font-bold text-lg cursor-pointer transition-transform active:scale-95"
+            className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center font-bold text-base cursor-pointer transition-transform active:scale-95"
             style={{ backgroundColor: patient.avatarColor || '#f3f0ff', color: patient.avatarColor ? '#fff' : '#7360f2' }}
             onClick={() => setShowInfo(true)}
           >
             {patient.surname[0]}
           </div>
           <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setShowInfo(true)}>
-            <h3 className="font-bold text-gray-900 dark:text-gray-100 truncate">{patient.surname}, {patient.firstName}</h3>
-            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">{patient.ward} • {patient.roomNumber}</p>
+            <h3 className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate leading-tight">{patient.surname}, {patient.firstName}</h3>
+            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-tight truncate">{patient.ward} • {patient.roomNumber}</p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 shrink-0">
           {isMember && (
             <button onClick={() => setShowAddMember(true)} className="p-2 text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors" title="Add Participant">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path></svg>
             </button>
           )}
           <button onClick={() => setShowInfo(true)} className="p-2 text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
           </button>
         </div>
       </div>
