@@ -1,56 +1,61 @@
 import React, { useState, useEffect } from 'react';
-// index.css is muted to prevent the build error you encountered
 // import './index.css'; 
-
 import PatientList from './components/PatientList';
 import ChatThread from './components/ChatThread';
-
-// ROAD MAP: Corrected path for types
 import { Patient, Message, UserProfile } from './types'; 
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<'chat_list' | 'thread' | 'contacts' | 'profile'>('chat_list');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
-  const [patients, setPatients] = useState<Patient[]>([]);
+  
+  // 1. MEMORY FIX: Try to load patients from the phone's storage on startup
+  const [patients, setPatients] = useState<Patient[]>(() => {
+    const saved = localStorage.getItem('clinichat_patients');
+    return saved ? JSON.parse(saved) : [];
+  });
+
   const [messages, setMessages] = useState<Message[]>([]);
   
-  // FIX: Force role to 'HCW' so the Add Patient button (+) appears
-  const [currentUser, setCurrentUser] = useState<any>({
+  const [currentUser] = useState<any>({
     id: '1',
     name: 'Clinical User',
     role: 'HCW',
     photo: ''
   });
 
-  const [isLoading, setIsLoading] = useState(false); 
+  // 2. MEMORY FIX: Every time the 'patients' list changes, save it to the phone
+  useEffect(() => {
+    localStorage.setItem('clinichat_patients', JSON.stringify(patients));
+  }, [patients]);
 
   const activePatient = patients.find(p => p.id === selectedPatientId);
 
-  // Safety guard for blank screens
-  if (isLoading) {
-    return <div className="h-screen flex items-center justify-center font-bold text-purple-600">Loading Clinical App...</div>;
-  }
+  // 3. DISCHARGE FIX: This is the actual wiring for the red button
+  const handleDischarge = () => {
+    if (!selectedPatientId) return;
+    
+    setPatients(prev => prev.map(p => 
+      p.id === selectedPatientId 
+        ? { ...p, isArchived: true, dateDischarged: new Date().toISOString().split('T')[0] } 
+        : p
+    ));
+    
+    setCurrentView('chat_list');
+    setSelectedPatientId(null);
+  };
 
   return (
     <div className="flex h-screen w-full bg-white dark:bg-black overflow-hidden font-sans">
-      
-      {/* DESKTOP SIDEBAR */}
-      <div className="hidden md:flex flex-col w-72 border-r border-gray-200 dark:border-gray-800 shrink-0 bg-white dark:bg-gray-900">
-        <div className="p-6">
-          <h1 className="text-2xl font-black text-purple-600 tracking-tighter uppercase">CliniChat</h1>
-        </div>
-      </div>
-
       <main className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
         <div className="flex-1 relative overflow-hidden bg-gray-50 dark:bg-gray-950">
           
           {currentView === 'chat_list' && (
             <PatientList 
-              patients={patients || []} 
-              messages={messages || []} 
+              patients={patients} 
+              messages={messages} 
               onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); }}
-              currentUser={currentUser!}
-              onReadmit={async () => {}}
+              currentUser={currentUser}
+              onReadmit={() => {}} 
               setPatients={async (newPatient) => { 
                 setPatients(prev => [...prev, { ...newPatient, id: Date.now().toString() }]); 
               }}
@@ -58,59 +63,33 @@ const App: React.FC = () => {
             />
           )}
 
-          {currentView === 'thread' && (
-            activePatient ? (
-              <ChatThread 
-                patient={activePatient}
-                messages={(messages || []).filter(m => m.patientId === selectedPatientId)}
-                currentUser={currentUser!}
-                users={[]} 
-                onBack={() => { setCurrentView('chat_list'); setSelectedPatientId(null); }}
-                onSendMessage={async (msg) => {
-                  setMessages(prev => [...prev, { ...msg, id: Date.now().toString(), timestamp: new Date().toISOString(), readBy: [currentUser!.id] }]);
-                }}
-                onUploadMedia={async (file) => { console.log("File selected:", file); }}
-                onUpdatePatient={async () => {}}
-               onDischarge={async () => {
-  // 1. Move the patient to the archived list
-  setPatients(prev => prev.map(p => 
-    p.id === selectedPatientId ? { ...p, isArchived: true, dateDischarged: new Date().toISOString().split('T')[0] } : p
-  ));
-  // 2. Go back to the main list automatically
-  setCurrentView('chat_list');
-  setSelectedPatientId(null);
-  alert("Patient has been discharged and moved to the archive.");
-}}
-                onReadmit={async () => {}}
-                onAddMember={async () => {}}
-                onLeaveThread={async () => {}}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full p-10 text-center">
-                <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Finding Thread...</p>
-                <button onClick={() => setCurrentView('chat_list')} className="mt-4 text-purple-600 font-black uppercase text-xs underline">Back to List</button>
-              </div>
-            )
+          {currentView === 'thread' && activePatient && (
+            <ChatThread 
+              patient={activePatient}
+              messages={messages.filter(m => m.patientId === selectedPatientId)}
+              currentUser={currentUser}
+              users={[]} 
+              onBack={() => { setCurrentView('chat_list'); setSelectedPatientId(null); }}
+              onSendMessage={async (msg) => {
+                setMessages(prev => [...prev, { ...msg, id: Date.now().toString(), timestamp: new Date().toISOString() }]);
+              }}
+              onUploadMedia={async () => {}}
+              onUpdatePatient={async () => {}}
+              onDischarge={handleDischarge} // <--- WIRED HERE
+              onReadmit={async () => {}}
+              onAddMember={async () => {}}
+              onLeaveThread={async () => {}}
+            />
           )}
         </div>
 
-        {/* MOBILE NAVIGATION BAR - Fixed height for phone screens */}
         {currentView !== 'thread' && (
-          <nav className="h-20 pb-6 shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center z-50">
-            <button 
-              onClick={() => setCurrentView('chat_list')}
-              className={`flex flex-col items-center justify-center flex-1 h-full ${currentView === 'chat_list' ? 'text-purple-600' : 'text-gray-400'}`}
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-              <span className="text-[10px] font-black uppercase tracking-tighter mt-1">Threads</span>
+          <nav className="h-20 pb-6 shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 flex justify-around items-center z-50">
+            <button onClick={() => setCurrentView('chat_list')} className="flex flex-col items-center flex-1 text-purple-600">
+              <span className="text-[10px] font-black uppercase">Threads</span>
             </button>
-
-            <button 
-              onClick={() => alert("Profile coming soon!")}
-              className="flex flex-col items-center justify-center flex-1 h-full text-gray-400"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-              <span className="text-[10px] font-black uppercase tracking-tighter mt-1">Profile</span>
+            <button className="flex flex-col items-center flex-1 text-gray-400">
+              <span className="text-[10px] font-black uppercase">Profile</span>
             </button>
           </nav>
         )}
