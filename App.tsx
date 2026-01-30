@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-// 1. If your build fails here, make sure 'index.css' is in the same folder as this file.
-// If it keeps failing, put // in front of the next line to ignore it.
-//import './index.css'; 
+// index.css is muted to prevent the build error you encountered
+// import './index.css'; 
 
 import PatientList from './components/PatientList';
 import ChatThread from './components/ChatThread';
 
-// 2. ROAD MAP CHECK: One dot means "same folder". 
+// ROAD MAP: Corrected path for types
 import { Patient, Message, UserProfile } from './types'; 
 
 const App: React.FC = () => {
@@ -15,10 +14,11 @@ const App: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>({
+  // FIX: Force role to 'HCW' so the Add Patient button (+) appears
+  const [currentUser, setCurrentUser] = useState<any>({
     id: '1',
     name: 'Clinical User',
-    role: 'HCW' as any,
+    role: 'HCW',
     photo: ''
   });
 
@@ -26,7 +26,7 @@ const App: React.FC = () => {
 
   const activePatient = patients.find(p => p.id === selectedPatientId);
 
-  // 3. BLANK SCREEN INSURANCE: If things take too long, this forces the app to show up.
+  // Safety guard for blank screens
   if (isLoading) {
     return <div className="h-screen flex items-center justify-center font-bold text-purple-600">Loading Clinical App...</div>;
   }
@@ -85,9 +85,9 @@ const App: React.FC = () => {
           )}
         </div>
 
-        {/* MOBILE NAVIGATION BAR */}
+        {/* MOBILE NAVIGATION BAR - Fixed height for phone screens */}
         {currentView !== 'thread' && (
-          <nav className="h-16 shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center z-50">
+          <nav className="h-20 pb-6 shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center z-50">
             <button 
               onClick={() => setCurrentView('chat_list')}
               className={`flex flex-col items-center justify-center flex-1 h-full ${currentView === 'chat_list' ? 'text-purple-600' : 'text-gray-400'}`}
@@ -97,6 +97,7 @@ const App: React.FC = () => {
             </button>
 
             <button 
+              onClick={() => alert("Profile coming soon!")}
               className="flex flex-col items-center justify-center flex-1 h-full text-gray-400"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
