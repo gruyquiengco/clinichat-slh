@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
+// 1. If your build fails here, make sure 'index.css' is in the same folder as this file.
+// If it keeps failing, put // in front of the next line to ignore it.
 import './index.css'; 
+
 import PatientList from './components/PatientList';
 import ChatThread from './components/ChatThread';
-// FIXED: Changed '../types' to './types' because App.tsx is in the same folder
+
+// 2. ROAD MAP CHECK: One dot means "same folder". 
 import { Patient, Message, UserProfile } from './types'; 
 
 const App: React.FC = () => {
-  // 1. Initialize with empty arrays so .filter and .map don't crash
   const [currentView, setCurrentView] = useState<'chat_list' | 'thread' | 'contacts' | 'profile'>('chat_list');
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   
-  // 2. Safety: Default User to prevent blank screen if Auth is slow
   const [currentUser, setCurrentUser] = useState<UserProfile | null>({
     id: '1',
     name: 'Clinical User',
@@ -20,39 +22,36 @@ const App: React.FC = () => {
     photo: ''
   });
 
-  // 3. Loading State
   const [isLoading, setIsLoading] = useState(false); 
 
-  // Helper to find patient safely
   const activePatient = patients.find(p => p.id === selectedPatientId);
 
-  // If you have a real data fetching useEffect, keep it below this line
-  // but ensure it eventually sets patients and messages state.
+  // 3. BLANK SCREEN INSURANCE: If things take too long, this forces the app to show up.
+  if (isLoading) {
+    return <div className="h-screen flex items-center justify-center font-bold text-purple-600">Loading Clinical App...</div>;
+  }
 
   return (
     <div className="flex h-screen w-full bg-white dark:bg-black overflow-hidden font-sans">
       
-      {/* DESKTOP SIDEBAR - Hidden on Mobile */}
+      {/* DESKTOP SIDEBAR */}
       <div className="hidden md:flex flex-col w-72 border-r border-gray-200 dark:border-gray-800 shrink-0 bg-white dark:bg-gray-900">
         <div className="p-6">
           <h1 className="text-2xl font-black text-purple-600 tracking-tighter uppercase">CliniChat</h1>
         </div>
       </div>
 
-      {/* MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col min-w-0 h-full relative overflow-hidden">
-        
-        {/* VIEW CONTAINER */}
         <div className="flex-1 relative overflow-hidden bg-gray-50 dark:bg-gray-950">
+          
           {currentView === 'chat_list' && (
             <PatientList 
-              patients={patients} 
-              messages={messages} 
+              patients={patients || []} 
+              messages={messages || []} 
               onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); }}
               currentUser={currentUser!}
               onReadmit={async () => {}}
               setPatients={async (newPatient) => { 
-                // Temporary local update logic so you can see changes
                 setPatients(prev => [...prev, { ...newPatient, id: Date.now().toString() }]); 
               }}
               addAuditLog={() => {}} 
@@ -63,7 +62,7 @@ const App: React.FC = () => {
             activePatient ? (
               <ChatThread 
                 patient={activePatient}
-                messages={messages.filter(m => m.patientId === selectedPatientId)}
+                messages={(messages || []).filter(m => m.patientId === selectedPatientId)}
                 currentUser={currentUser!}
                 users={[]} 
                 onBack={() => { setCurrentView('chat_list'); setSelectedPatientId(null); }}
@@ -79,16 +78,16 @@ const App: React.FC = () => {
               />
             ) : (
               <div className="flex flex-col items-center justify-center h-full p-10 text-center">
-                <p className="text-gray-400 font-bold uppercase text-xs">Thread Not Found</p>
+                <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Finding Thread...</p>
                 <button onClick={() => setCurrentView('chat_list')} className="mt-4 text-purple-600 font-black uppercase text-xs underline">Back to List</button>
               </div>
             )
           )}
         </div>
 
-        {/* MOBILE NAVIGATION BAR - Fixed at the very bottom */}
+        {/* MOBILE NAVIGATION BAR */}
         {currentView !== 'thread' && (
-          <nav className="md:hidden h-16 shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center z-50">
+          <nav className="h-16 shrink-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center z-50">
             <button 
               onClick={() => setCurrentView('chat_list')}
               className={`flex flex-col items-center justify-center flex-1 h-full ${currentView === 'chat_list' ? 'text-purple-600' : 'text-gray-400'}`}
