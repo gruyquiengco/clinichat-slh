@@ -71,7 +71,16 @@ const App: React.FC = () => {
                 }}
                 onUploadMedia={async (file) => { console.log("File selected:", file); }}
                 onUpdatePatient={async () => {}}
-                onDischarge={async () => {}}
+               onDischarge={async () => {
+  // 1. Move the patient to the archived list
+  setPatients(prev => prev.map(p => 
+    p.id === selectedPatientId ? { ...p, isArchived: true, dateDischarged: new Date().toISOString().split('T')[0] } : p
+  ));
+  // 2. Go back to the main list automatically
+  setCurrentView('chat_list');
+  setSelectedPatientId(null);
+  alert("Patient has been discharged and moved to the archive.");
+}}
                 onReadmit={async () => {}}
                 onAddMember={async () => {}}
                 onLeaveThread={async () => {}}
