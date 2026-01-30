@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 // 1. If your build fails here, make sure 'index.css' is in the same folder as this file.
 // If it keeps failing, put // in front of the next line to ignore it.
-import './index.css'; 
+//import './index.css'; 
 
 import PatientList from './components/PatientList';
 import ChatThread from './components/ChatThread';
