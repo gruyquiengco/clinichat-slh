@@ -88,27 +88,10 @@ const ChatThread: React.FC<ChatThreadProps> = ({
         })}
       </div>
 
-      {/* INPUT BAR - Fixed Bottom Padding for Mobile Browsers */}
-      {!patient.isArchived && (
-        <div className="absolute bottom-0 left-0 right-0 p-3 bg-white dark:bg-gray-900 border-t pb-8">
-          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-2xl p-1 px-2">
-            <button onClick={() => fileInputRef.current?.click()} className="p-2 text-purple-600">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" /></svg>
-            </button>
-            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={(e) => e.target.files?.[0] && onUploadMedia?.(e.target.files[0])} />
-            <input 
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Enter clinical update..." 
-              className="flex-1 bg-transparent border-none focus:ring-0 text-sm py-3 dark:text-white"
-            />
-            <button onClick={handleSend} className="p-2.5 bg-purple-600 text-white rounded-xl shadow-md">
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" /></svg>
-            </button>
-          </div>
-        </div>
-      )}
+      {/* INPUT BAR - No longer absolute, now part of the flex flow */}
+{!patient.isArchived && (
+  <div className="p-3 bg-white dark:bg-gray-900 border-t shrink-0 pb-10 sm:pb-4">
+
 
       {/* SIDEBAR / CLINICAL INFO */}
       {showDetails && (
