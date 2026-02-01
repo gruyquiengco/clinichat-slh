@@ -59,7 +59,7 @@ const ChatThread: React.FC<ChatThreadProps> = ({
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
           </button>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center font-black text-white bg-blue-400 text-[10px]">
-            {patient.surname[0]}{patient.firstName[0]}
+            {patient.surname?.[0] || ''}{patient.firstName?.[0] || ''}
           </div>
           <div>
             <h3 className="font-bold text-sm dark:text-white leading-tight">{patient.surname}, {patient.firstName}</h3>
@@ -88,7 +88,7 @@ const ChatThread: React.FC<ChatThreadProps> = ({
         })}
       </div>
 
-      {/* INPUT BAR - Fixed for Desktop and Mobile */}
+      {/* INPUT BAR */}
       {!patient.isArchived && (
         <div className="p-3 bg-white dark:bg-gray-900 border-t shrink-0 pb-10 sm:pb-4">
           <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded-2xl p-1 px-2">
@@ -123,12 +123,12 @@ const ChatThread: React.FC<ChatThreadProps> = ({
             <div className="space-y-4">
               <div className="flex flex-col items-center pb-6 border-b dark:border-gray-800">
                 <div className="w-20 h-20 rounded-3xl bg-blue-400 flex items-center justify-center text-2xl font-black text-white shadow-lg mb-3">
-                  {patient.surname[0]}{patient.firstName[0]}
+                  {patient.surname?.[0] || ''}{patient.firstName?.[0] || ''}
                 </div>
                 {isEditing ? (
                   <div className="space-y-2 w-full">
-                    <input className="w-full p-2 border rounded dark:bg-gray-800 dark:text-white" value={editedPatient.surname} onChange={e => setEditedPatient({...editedPatient, surname: e.target.value})} placeholder="Surname" />
-                    <input className="w-full p-2 border rounded dark:bg-gray-800 dark:text-white" value={editedPatient.firstName} onChange={e => setEditedPatient({...editedPatient, firstName: e.target.value})} placeholder="First Name" />
+                    <input className="w-full p-2 border rounded dark:bg-gray-800 dark:text-white" value={editedPatient.surname} onChange={e => setEditedPatient({...editedPatient, surname: e.target.value})} />
+                    <input className="w-full p-2 border rounded dark:bg-gray-800 dark:text-white" value={editedPatient.firstName} onChange={e => setEditedPatient({...editedPatient, firstName: e.target.value})} />
                   </div>
                 ) : (
                   <h3 className="text-lg font-black dark:text-white">{patient.surname}, {patient.firstName}</h3>
