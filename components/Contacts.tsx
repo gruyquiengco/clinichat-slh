@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { UserProfile, UserRole } from '../types';
+import { DEPARTMENT_OPTIONS, DEPARTMENT_COLORS } from '../constants';
 
 interface ContactsProps {
   users: UserProfile[];
@@ -17,17 +18,6 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   const [showTempPassword, setShowTempPassword] = useState(false);
 
-  // Department List
-  const departments = [
-    "Surgery",
-    "Internal Medicine",
-    "Adult IDS",
-    "Pediatrics",
-    "OB-Gyne",
-    "Anesthesia",
-    "Nursing"
-  ];
-
   const capitalizeName = (str: string) => {
     return str
       .trim()
@@ -44,30 +34,39 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
     return cleaned;
   };
 
+  const getInitials = (user: UserProfile) => {
+    const f = user.firstName[0] || '';
+    const m = user.middleName ? user.middleName[0] : '';
+    const s = user.surname[0] || '';
+    return `${f}${m}${s}`.toUpperCase();
+  };
+
   const filteredUsers = users.filter(u => 
     u.id !== currentUser.id &&
     (u.firstName.toLowerCase().includes(search.toLowerCase()) || 
      u.surname.toLowerCase().includes(search.toLowerCase()) ||
-     (u.department && u.department.toLowerCase().includes(search.toLowerCase())))
+     u.department.toLowerCase().includes(search.toLowerCase()))
   );
 
   const handleAddNewUser = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const selectedRole = formData.get('role') as UserRole;
+    const department = formData.get('department') as string;
     const password = formData.get('password') as string;
     
     const newUser: UserProfile = {
       id: Math.random().toString(36).substr(2, 9),
       surname: capitalizeName(formData.get('surname') as string),
       firstName: capitalizeName(formData.get('firstName') as string),
+      middleName: (formData.get('middleName') as string).toUpperCase(),
       specialization: formData.get('specialization') as string,
-      department: formData.get('department') as string, // Now captured from dropdown
+      department: department,
       email: formData.get('email') as string,
       phone: formData.get('phone') as string,
       role: selectedRole,
       password: password || 'password123',
-      photo: `https://picsum.photos/seed/${Math.random()}/100/100`
+      photo: '' // Default empty for initials avatar
     };
     onAddUser(newUser);
     setShowAddModal(false);
@@ -131,9 +130,18 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
           return (
             <div key={user.id} className="flex flex-col p-4 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors">
               <div className="flex items-center gap-4 mb-3">
-                <img src={user.photo || `https://picsum.photos/seed/${user.id}/100/100`} className="w-12 h-12 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm" alt="P" />
+                {user.photo ? (
+                  <img src={user.photo} className="w-12 h-12 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm" alt="" />
+                ) : (
+                  <div 
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-white font-black text-xs shadow-md border-2 border-white dark:border-gray-800"
+                    style={{ backgroundColor: DEPARTMENT_COLORS[user.department] || '#7360f2' }}
+                  >
+                    {getInitials(user)}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
-                   <h4 className="font-bold text-gray-900 dark:text-gray-100">{user.firstName} {user.surname}</h4>
+                   <h4 className="font-bold text-gray-900 dark:text-gray-100">{user.firstName} {user.middleName ? `${user.middleName}. ` : ''}{user.surname}</h4>
                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.specialization} • {user.department}</p>
                    
                    <div className="flex items-center gap-2 mt-1">
@@ -181,13 +189,22 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
               </div>
               
               <div className="grid grid-cols-3 gap-2">
-                 <a href={`tel:${user.phone}`} className="flex items-center justify-center py-2 text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                 <a 
+                   href={`tel:${user.phone}`} 
+                   className="flex items-center justify-center py-2 text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                 >
                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
                  </a>
-                 <a href={`viber://chat?number=${cleanPhone}`} className="flex items-center justify-center py-2 text-white bg-[#7360f2] rounded-xl hover:opacity-90 transition-all active:scale-95">
-                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.156 16.594c-.234-.406-.86-.672-1.797-1.156-.812-.422-1.406-.672-1.78-.734-.235-.047-.453.03-.64.235-.188.203-.438.562-.75.984-.282.375-.547.438-.938.25-.437-.203-1.078-.516-1.875-1.125-.86-.656-1.422-1.25-1.703-1.797-.188-.344-.14-.594.14-.953.25-.328.532-.61.86-.922.25-.219.344-.438.282-.672-.047-.187-.297-.78-.734-1.781-.438-.984-.719-1.578-1.016-1.781-.172-.14-.375-.156-.563-.047-.328.203-.797.516-1.375 1.094-.656.656-.984 1.36-.984 2.062 0 .938.453 2.047 1.344 3.328a15.72 15.72 0 004.78 4.78c1.282.891 2.391 1.344 3.329 1.344.703 0 1.406-.328 2.062-.984.578-.578.891-1.047 1.094-1.375.11-.188.094-.39-.047-.562zM24 12c0 6.627-5.373 12-12 12S0 18.627 0 12 5.373 0 12 0s12 5.373 12 12z"/></svg>
+                 <a 
+                   href={`viber://chat?number=${cleanPhone}`} 
+                   className="flex items-center justify-center py-2 text-white bg-[#7360f2] rounded-xl hover:opacity-90 transition-all active:scale-95"
+                 >
+                   <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.156 16.594c-.234-.406-.86-.672-1.797-1.156-.812-.422-1.406-.672-1.78-.734-.235-.047-.453.03-.64.235-.188.203-.438.562-.75.984-.282.375-.547.438-.938.25-.437-.203-1.078-.516-1.875-1.125-.86-.656-1.422-1.25-1.703-1.797-.188-.344-.14-.594.14-.953.25-.328.532-.61.86-.922.25-.219.344-.438.282-.672-.047-.187-.297-.78-.734-1.781-.438-.984-.719-1.578-1.016-1.781-.172-.14-.375-.156-.563-.047-.328.203-.797.516-1.375 1.094-.656.656-.984 1.36-.984 2.062 0 .938.453 2.047 1.344 3.328a15.72 15.72 0 004.78 4.78c1.282.891 2.391 1.344 3.329 1.344.703 0 1.406-.328 2.062-.984.578-.578.891-1.047 1.094-1.375.11-.188.094-.39-.047-.562z"/></svg>
                  </a>
-                 <a href={`mailto:${user.email}`} className="flex items-center justify-center py-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors">
+                 <a 
+                   href={`mailto:${user.email}`} 
+                   className="flex items-center justify-center py-2 text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-xl hover:bg-purple-100 dark:hover:bg-purple-900/40 transition-colors"
+                 >
                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v10a2 2 0 002 2z"></path></svg>
                  </a>
               </div>
@@ -197,8 +214,8 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
       </div>
 
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 dark:bg-black/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-all">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 shadow-2xl transition-colors">
+        <div className="fixed inset-0 bg-black/50 dark:bg-black/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-all overflow-y-auto">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md my-auto overflow-hidden animate-in fade-in zoom-in duration-200 shadow-2xl transition-colors">
             <div className="p-6 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center">
               <h3 className="text-xl font-bold dark:text-white">Register New User</h3>
               <button onClick={() => setShowAddModal(false)} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300">
@@ -218,6 +235,10 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Middle Initial</label>
+                  <input name="middleName" className="w-full p-2 bg-gray-50 dark:bg-gray-800 dark:text-white border dark:border-gray-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-500" maxLength={1} placeholder="M" />
+                </div>
+                <div>
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Role Assignment</label>
                   <select name="role" required className="w-full p-2 bg-gray-50 dark:bg-gray-800 dark:text-white border dark:border-gray-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-500">
                     <option value={UserRole.HCW}>HCW (Care Team)</option>
@@ -225,14 +246,14 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
                     {isAdmin && <option value={UserRole.ADMIN}>ADMIN (Database)</option>}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Department</label>
-                  <select name="department" required className="w-full p-2 bg-gray-50 dark:bg-gray-800 dark:text-white border dark:border-gray-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-500">
-                    {departments.map(dept => (
-                      <option key={dept} value={dept}>{dept}</option>
-                    ))}
-                  </select>
-                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Department</label>
+                <select name="department" required className="w-full p-2 bg-gray-50 dark:bg-gray-800 dark:text-white border dark:border-gray-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-500">
+                  {DEPARTMENT_OPTIONS.map(dept => (
+                    <option key={dept} value={dept}>{dept}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Specialization / Designation</label>
@@ -242,7 +263,7 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
                 <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Email Address</label>
                 <input name="email" type="email" required className="w-full p-2 bg-gray-50 dark:bg-gray-800 dark:text-white border dark:border-gray-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-500" placeholder="hospital@domain.com" />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Phone Number</label>
                   <input name="phone" required className="w-full p-2 bg-gray-50 dark:bg-gray-800 dark:text-white border dark:border-gray-700 rounded-lg text-sm outline-none focus:ring-1 focus:ring-purple-500" placeholder="09XX-XXX-XXXX" />
@@ -262,11 +283,7 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
                       onClick={() => setShowTempPassword(!showTempPassword)}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-purple-600 transition-colors"
                     >
-                      {showTempPassword ? (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                      ) : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.04m4.533-4.461A10.001 10.001 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.017 10.017 0 01-1.39 3.036m-4.208-4.138a3 3 0 11-4.243-4.243M9.878 9.878l4.242 4.242M3 3l18 18"></path></svg>
-                      )}
+                      {showTempPassword ? "🙈" : "👁️"}
                     </button>
                   </div>
                 </div>
@@ -287,13 +304,19 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
             </div>
             <h4 className="text-xl font-black text-gray-900 dark:text-white mb-2 leading-tight">Revoke Access?</h4>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-8 leading-relaxed">
-              Are you sure you want to remove <span className="font-bold text-gray-700 dark:text-gray-300">{userToDelete.firstName} {userToDelete.surname}</span> from the system?
+              Are you sure you want to remove <span className="font-bold text-gray-700 dark:text-gray-300">{userToDelete.firstName} {userToDelete.surname}</span> from the system? This action is permanent.
             </p>
             <div className="flex flex-col gap-3">
-              <button onClick={handleDeleteConfirm} className="w-full py-4 text-sm font-black text-white bg-red-600 rounded-2xl shadow-xl hover:bg-red-700 active:scale-95 transition-all">
+              <button 
+                onClick={handleDeleteConfirm} 
+                className="w-full py-4 text-sm font-black text-white bg-red-600 rounded-2xl shadow-xl shadow-red-200 dark:shadow-none hover:bg-red-700 active:scale-95 transition-all"
+              >
                 Yes, Delete User
               </button>
-              <button onClick={() => setUserToDelete(null)} className="w-full py-3 text-sm font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+              <button 
+                onClick={() => setUserToDelete(null)} 
+                className="w-full py-3 text-sm font-bold text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              >
                 Cancel
               </button>
             </div>
@@ -305,3 +328,9 @@ const Contacts: React.FC<ContactsProps> = ({ users, onBack, currentUser, onDelet
 };
 
 export default Contacts;
+
+
+
+
+
+
