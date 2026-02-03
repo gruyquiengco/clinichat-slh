@@ -296,3 +296,9 @@ const Reports: React.FC<ReportsProps> = ({ patients, logs, users, currentUser, o
 };
 
 export default Reports;
+
+
+
+
+
+
