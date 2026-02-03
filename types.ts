@@ -1,21 +1,21 @@
 export enum UserRole {
-  ADMIN = 'ADMIN',
-  HCW_MD = 'HCW-MD',
-  HCW_RN = 'HCW-RN',
-  SYSCLERK = 'SYSCLERK',
+  ADMIN = 'database admin',
+  HCW = 'HCW',
+  SYSCLERK = 'sysclerk'
 }
 
 export interface UserProfile {
   id: string;
   surname: string;
   firstName: string;
+  middleName?: string; // Support for 3-letter initials
   specialization: string;
   department: string;
   photo?: string;
   email: string;
   phone: string;
   role: UserRole;
-  password?: string; // Added for real authentication
+  password?: string;
   darkMode?: boolean;
   darkModeSchedule?: {
     enabled: boolean;
@@ -35,10 +35,10 @@ export interface Patient {
   ward: string;
   roomNumber: string;
   dateAdmitted: string;
-  dateDischarged?: string; // Captures when the patient was archived/discharged
+  dateDischarged?: string;
   isArchived: boolean;
   mainHCWId: string;
-  members: string[]; // List of User IDs
+  members: string[];
   avatarColor?: string;
   chatBg?: string;
 }
@@ -52,10 +52,10 @@ export interface Message {
   type: 'text' | 'image' | 'video' | 'system';
   attachmentUrl?: string;
   reactions: {
-    check: string[]; // User IDs
-    cross: string[]; // User IDs
+    check: string[];
+    cross: string[];
   };
-  readBy: string[]; // User IDs
+  readBy: string[];
   replyToId?: string;
 }
 
@@ -69,3 +69,9 @@ export interface AuditLog {
 }
 
 export type AppView = 'login' | 'chat_list' | 'thread' | 'contacts' | 'profile' | 'audit' | 'reports';
+
+
+
+
+
+
