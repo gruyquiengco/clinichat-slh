@@ -1,79 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CliniChat SLH</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#7360f2">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              viber: {
-                purple: '#7360f2',
-                bg: '#f5f6f7',
-                dark: '#1a1b1e',
-                'bubble-user': '#e6e2ff',
-                'bubble-dark-user': '#4c3bb1',
-                'bubble-dark-other': '#2c2d31',
-              }
-            }
-          }
-        }
-      }
-    </script>
-    <style>
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
-        .viber-purple { background-color: #7360f2; }
-        .viber-bg { background-color: #f5f6f7; }
-        .viber-bubble-user { background-color: #e6e2ff; }
-        .viber-bubble-other { background-color: #ffffff; }
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        
-        @keyframes pulse-red {
-          0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-          70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
-          100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-        }
-        .animate-recording {
-          animation: pulse-red 2s infinite;
-        }
+    
+    <title>CliniChat SLH</title>
 
-        /* Smooth theme transition */
-        html { transition: background-color 0.3s ease, color 0.3s ease; }
-    </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js",
-    "@google/genai": "https://esm.sh/@google/genai@^1.35.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "firebase/": "https://esm.sh/firebase@^12.8.0/"
-  }
-}
-</script>
-<link rel="stylesheet" href="/index.css">
-</head>
-<body class="bg-viber-bg dark:bg-viber-dark h-screen overflow-hidden">
+    </head>
+  <body>
     <div id="root"></div>
-<script type="module" src="/index.tsx"></script>
-</body>
+    
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
-
-
-
-
-
-
