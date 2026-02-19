@@ -226,16 +226,21 @@ const App: React.FC = () => {
         {currentView === 'audit' && currentUser?.role === UserRole.ADMIN && <AuditTrail logs={auditLogs} users={users} onBack={() => setCurrentView('chat_list')} />}
         {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
 
-        {/* Mobile Nav */}
-        <div className="md:hidden absolute bottom-0 left-0 right-0 h-16 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center px-4 z-[60]">
-          <button onClick={() => setCurrentView('chat_list')} className={`text-xs font-bold ${currentView === 'chat_list' ? 'text-purple-600' : 'text-gray-400'}`}>Threads</button>
-          <button onClick={() => setCurrentView('contacts')} className={`text-xs font-bold ${currentView === 'contacts' ? 'text-purple-600' : 'text-gray-400'}`}>Contacts</button>
-          <button onClick={() => setCurrentView('reports')} className={`text-xs font-bold ${currentView === 'reports' ? 'text-purple-600' : 'text-gray-400'}`}>Reports</button>
-          <button onClick={() => setCurrentView('profile')} className={`text-xs font-bold ${currentView === 'profile' ? 'text-purple-600' : 'text-gray-400'}`}>Profile</button>
-        </div>
-      </main>
-      <div className="fixed bottom-0 right-0 bg-black/50 text-white text-[8px] px-2 py-0.5 rounded-tl-md z-[70]">DPA 2012 COMPLIANT</div>
-    </div>
+        {/* Mobile Navigation - Enhanced for visibility */}
+<div className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center px-4 z-[100] pb-safe">
+  <button onClick={() => setCurrentView('chat_list')} className={`flex flex-col items-center p-2 ${currentView === 'chat_list' ? 'text-purple-600' : 'text-gray-400'}`}>
+    <span className="text-[10px] font-bold">Threads</span>
+  </button>
+  <button onClick={() => setCurrentView('contacts')} className={`flex flex-col items-center p-2 ${currentView === 'contacts' ? 'text-purple-600' : 'text-gray-400'}`}>
+    <span className="text-[10px] font-bold">Contacts</span>
+  </button>
+  <button onClick={() => setCurrentView('reports')} className={`flex flex-col items-center p-2 ${currentView === 'reports' ? 'text-purple-600' : 'text-gray-400'}`}>
+    <span className="text-[10px] font-bold">Reports</span>
+  </button>
+  <button onClick={() => setCurrentView('profile')} className={`flex flex-col items-center p-2 ${currentView === 'profile' ? 'text-purple-600' : 'text-gray-400'}`}>
+    <span className="text-[10px] font-bold">Profile</span>
+  </button>
+</div>
   );
 };
 
