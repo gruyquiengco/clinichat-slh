@@ -1,102 +1,117 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase-config'; 
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 
+// Define the views available in the app
 type AppView = 'chat_list' | 'contacts' | 'reports' | 'profile';
 
 export default function App() {
+  // 1. STATE & UI LOGIC
   const [currentView, setCurrentView] = useState<AppView>('chat_list');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [inputText, setInputText] = useState(''); // State for the text box
+  const [threads, setThreads] = useState<any[]>([]); // This holds your patient threads
+  const [loading, setLoading] = useState(true);
 
-  // 1. Listen for Messages
+  // 2. FIREBASE LOGIC (Restoring communication with your database)
   useEffect(() => {
-    const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
+    // We are looking for a collection named "threads". 
+    // If your Firebase uses "chats" or "messages", change the word below.
+    const q = query(collection(db, "threads"), orderBy("createdAt", "desc"));
+    
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const threadData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setThreads(threadData);
+      setLoading(false);
+    }, (error) => {
+      console.error("Firebase connection error:", error);
+      setLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
 
-  // 2. Function to Send a Message
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim()) return;
-
-    await addDoc(collection(db, "messages"), {
-      text: inputText,
-      createdAt: serverTimestamp(),
-      sender: "User" // You can change this to a real username later
-    });
-    setInputText(''); // Clear the box after sending
-  };
-
+  // 3. VIEW RENDERER
   const renderView = () => {
+    if (loading) return <div className="p-8 text-center text-gray-500">Loading your clinic data...</div>;
+
     switch (currentView) {
       case 'chat_list':
         return (
-          <div className="flex flex-col h-[calc(100vh-120px)]">
-            <h2 className="text-xl font-bold mb-4">Active Threads</h2>
-            
-            {/* Scrollable Message List */}
-            <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-              {messages.length === 0 ? (
-                <p className="text-gray-500">No messages yet. Send one below!</p>
-              ) : (
-                messages.map(msg => (
-                  <div key={msg.id} className="p-3 bg-purple-50 rounded-lg border border-purple-100">
-                    <p className="text-xs text-purple-600 font-bold">{msg.sender}</p>
-                    <p className="text-gray-800">{msg.text}</p>
+          <div className="space-y-4">
+            <h2 className="text-xl font-bold text-purple-700 mb-4">Patient Chat Threads</h2>
+            {threads.length === 0 ? (
+              <div className="p-10 border-2 border-dashed rounded-xl text-center text-gray-400">
+                No active patient threads found in the database.
+              </div>
+            ) : (
+              threads.map(thread => (
+                <div key={thread.id} className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-start">
+                    <h3 className="font-bold text-gray-900">{thread.patientName || "General Inquiry"}</h3>
+                    <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">
+                      {thread.status || "Active"}
+                    </span>
                   </div>
-                ))
-              )}
-            </div>
-
-            {/* MESSAGE INPUT BOX */}
-            <form onSubmit={sendMessage} className="flex gap-2 p-2 border-t">
-              <input 
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
-              />
-              <button type="submit" className="bg-purple-600 text-white px-4 py-2 rounded-md font-bold">
-                Send
-              </button>
-            </form>
+                  <p className="text-sm text-gray-600 mt-2 truncate">{thread.lastMessage || "No messages yet..."}</p>
+                </div>
+              ))
+            )}
           </div>
         );
-      case 'contacts': return <div className="p-4">Staff Directory</div>;
-      default: return <div className="p-4">Select a view</div>;
+      case 'contacts':
+        return <div className="p-4 text-gray-700 font-medium">Medical Staff Directory</div>;
+      case 'reports':
+        return <div className="p-4 text-gray-700 font-medium">Clinical Reports & Logs</div>;
+      case 'profile':
+        return <div className="p-4 text-gray-700 font-medium">Your Practitioner Profile</div>;
+      default:
+        return <div className="p-4">Select a menu option.</div>;
     }
   };
 
+  // 4. MAIN UI
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      {/* MOBILE TOP BAR */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-purple-600 text-white flex items-center px-4 z-[100] shadow-lg">
-        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 bg-purple-700 rounded-md flex flex-col gap-1">
+        <button 
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          className="p-2 bg-purple-700 rounded-lg flex flex-col gap-1 focus:ring-2 focus:ring-white"
+        >
           <div className="w-6 h-0.5 bg-white"></div>
           <div className="w-6 h-0.5 bg-white"></div>
           <div className="w-6 h-0.5 bg-white"></div>
         </button>
-        <span className="ml-4 font-bold text-xl">CliniChat</span>
+        <span className="ml-4 font-bold text-xl tracking-tight">CliniChat</span>
       </header>
 
+      {/* MOBILE NAV MENU */}
       {isMenuOpen && (
         <div className="fixed inset-0 z-[110]">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setIsMenuOpen(false)} />
-          <nav className="absolute top-16 left-0 w-64 bg-white shadow-xl h-full border-r">
-            {['chat_list', 'contacts'].map((v) => (
-              <button key={v} onClick={() => {setCurrentView(v as AppView); setIsMenuOpen(false);}} className="w-full text-left p-4 border-b">
-                {v === 'chat_list' ? 'Threads' : 'Contacts'}
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)} />
+          <nav className="absolute top-16 left-0 w-72 h-full bg-white dark:bg-gray-900 shadow-2xl border-r border-gray-200 dark:border-gray-800 py-6 transform transition-transform duration-300">
+            {['chat_list', 'contacts', 'reports', 'profile'].map((view) => (
+              <button 
+                key={view}
+                onClick={() => {setCurrentView(view as AppView); setIsMenuOpen(false);}} 
+                className={`w-full text-left px-8 py-4 capitalize text-lg ${
+                  currentView === view 
+                  ? 'bg-purple-50 text-purple-600 font-bold border-r-4 border-purple-600' 
+                  : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {view.replace('_', ' ')}
               </button>
             ))}
           </nav>
         </div>
       )}
 
-      <main className="pt-20 p-4 max-w-4xl mx-auto">
+      {/* CONTENT AREA */}
+      <main className="pt-24 pb-12 px-4 max-w-2xl mx-auto">
         {renderView()}
       </main>
     </div>
