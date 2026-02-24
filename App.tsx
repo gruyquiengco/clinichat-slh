@@ -66,22 +66,18 @@ export default function App() {
 
       {/* MOBILE TOP BAR (The "3-Line" Icon Menu) */}
       <div className="md:hidden">
-        <header className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center px-4 z-[100]">
-          <button 
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="p-2 text-gray-600 dark:text-gray-300"
-          >
-            {/* Hamburger Icon */}
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {isMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
-          <span className="ml-3 font-bold text-purple-600 dark:text-white">CliniChat</span>
-        </header>
+        <header className="fixed top-0 left-0 right-0 h-16 bg-purple-600 text-white flex items-center px-4 z-[100] shadow-lg">
+  <button 
+    onClick={() => setIsMenuOpen(!isMenuOpen)}
+    className="p-2 bg-purple-700 rounded-md flex flex-col gap-1"
+  >
+    {/* These three lines make the hamburger menu icon */}
+    <div className="w-6 h-0.5 bg-white"></div>
+    <div className="w-6 h-0.5 bg-white"></div>
+    <div className="w-6 h-0.5 bg-white"></div>
+  </button>
+  <span className="ml-4 font-bold text-xl">CliniChat</span>
+</header>
 
         {/* MOBILE DROPDOWN MENU */}
         {isMenuOpen && (
@@ -100,13 +96,6 @@ export default function App() {
             </nav>
           </>
         )}
-      </div>
-
-      {/* MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-950 relative pt-16 md:pt-0">
-        {/* The pt-16 above prevents the Top Bar from covering your chat */}
-        {renderView()}
-      </main>
-    </div>
+       </div>
   );
 }
