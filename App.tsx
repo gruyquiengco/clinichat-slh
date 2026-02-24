@@ -1,74 +1,81 @@
 import React, { useState, useEffect } from 'react';
-// These imports connect to your Firebase files in the root folder
-import { db, auth } from './firebase-config'; 
+import { db } from './firebase-config'; 
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 
 type AppView = 'chat_list' | 'contacts' | 'reports' | 'profile';
 
 export default function App() {
-  // 1. STATE LOGIC
   const [currentView, setCurrentView] = useState<AppView>('chat_list');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [messages, setMessages] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [inputText, setInputText] = useState(''); // State for the text box
 
-  // 2. FIREBASE LOGIC (The "Brain")
+  // 1. Listen for Messages
   useEffect(() => {
-    // This looks for a 'messages' collection in your Firestore
     const q = query(collection(db, "messages"), orderBy("createdAt", "desc"));
-    
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setMessages(msgs);
-      setLoading(false);
+      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-
     return () => unsubscribe();
   }, []);
 
-  // 3. VIEW RENDERER (The "Switcher")
-  const renderView = () => {
-    if (loading) return <div className="p-4 text-center">Connecting to CliniChat...</div>;
+  // 2. Function to Send a Message
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim()) return;
 
+    await addDoc(collection(db, "messages"), {
+      text: inputText,
+      createdAt: serverTimestamp(),
+      sender: "User" // You can change this to a real username later
+    });
+    setInputText(''); // Clear the box after sending
+  };
+
+  const renderView = () => {
     switch (currentView) {
       case 'chat_list':
         return (
-          <div className="space-y-4">
+          <div className="flex flex-col h-[calc(100vh-120px)]">
             <h2 className="text-xl font-bold mb-4">Active Threads</h2>
-            {messages.length === 0 ? (
-              <p className="text-gray-500">No messages yet. Start a conversation!</p>
-            ) : (
-              messages.map(msg => (
-                <div key={msg.id} className="p-3 border rounded-lg bg-gray-50">
-                  <p className="text-sm font-semibold">{msg.sender || 'Anonymous'}</p>
-                  <p>{msg.text}</p>
-                </div>
-              ))
-            )}
+            
+            {/* Scrollable Message List */}
+            <div className="flex-1 overflow-y-auto space-y-4 mb-4">
+              {messages.length === 0 ? (
+                <p className="text-gray-500">No messages yet. Send one below!</p>
+              ) : (
+                messages.map(msg => (
+                  <div key={msg.id} className="p-3 bg-purple-50 rounded-lg border border-purple-100">
+                    <p className="text-xs text-purple-600 font-bold">{msg.sender}</p>
+                    <p className="text-gray-800">{msg.text}</p>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* MESSAGE INPUT BOX */}
+            <form onSubmit={sendMessage} className="flex gap-2 p-2 border-t">
+              <input 
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder="Type a message..."
+                className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+              />
+              <button type="submit" className="bg-purple-600 text-white px-4 py-2 rounded-md font-bold">
+                Send
+              </button>
+            </form>
           </div>
         );
-      case 'contacts':
-        return <div className="p-4">Directory of Medical Staff</div>;
-      case 'reports':
-        return <div className="p-4">Clinical Incident Reports</div>;
-      case 'profile':
-        return <div className="p-4">Account Settings</div>;
-      default:
-        return <div>Select a view</div>;
+      case 'contacts': return <div className="p-4">Staff Directory</div>;
+      default: return <div className="p-4">Select a view</div>;
     }
   };
 
-  // 4. THE UI (The "Face")
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
+    <div className="min-h-screen bg-white">
       <header className="fixed top-0 left-0 right-0 h-16 bg-purple-600 text-white flex items-center px-4 z-[100] shadow-lg">
-        <button 
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className="p-2 bg-purple-700 rounded-md flex flex-col gap-1 focus:outline-none"
-        >
+        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 bg-purple-700 rounded-md flex flex-col gap-1">
           <div className="w-6 h-0.5 bg-white"></div>
           <div className="w-6 h-0.5 bg-white"></div>
           <div className="w-6 h-0.5 bg-white"></div>
@@ -79,14 +86,10 @@ export default function App() {
       {isMenuOpen && (
         <div className="fixed inset-0 z-[110]">
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsMenuOpen(false)} />
-          <nav className="absolute top-16 left-0 w-64 bg-white dark:bg-gray-900 shadow-xl border-r border-gray-200 py-4 h-full">
-            {['chat_list', 'contacts', 'reports', 'profile'].map((view) => (
-              <button 
-                key={view}
-                onClick={() => {setCurrentView(view as AppView); setIsMenuOpen(false);}} 
-                className={`w-full text-left px-6 py-4 capitalize ${currentView === view ? 'bg-purple-50 text-purple-600 font-bold' : 'text-gray-800'}`}
-              >
-                {view.replace('_', ' ')}
+          <nav className="absolute top-16 left-0 w-64 bg-white shadow-xl h-full border-r">
+            {['chat_list', 'contacts'].map((v) => (
+              <button key={v} onClick={() => {setCurrentView(v as AppView); setIsMenuOpen(false);}} className="w-full text-left p-4 border-b">
+                {v === 'chat_list' ? 'Threads' : 'Contacts'}
               </button>
             ))}
           </nav>
