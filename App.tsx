@@ -1,168 +1,217 @@
-import React, { useState, useEffect } from 'react';
-import { db, auth } from './firebase-config'; 
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { UserRole, UserProfile, Patient, Message, AuditLog, AppView } from './types';
+import Login from './components/Login';
+import Sidebar from './components/Sidebar';
+import PatientList from './components/PatientList';
+import ChatThread from './components/ChatThread';
+import Contacts from './components/Contacts';
+import UserProfileView from './components/UserProfile';
+import AuditTrail from './components/AuditTrail';
+import Reports from './components/Reports';
+import { MOCK_USERS } from './constants';
+import { db } from './firebase-config';
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  updateDoc, 
+  addDoc, 
+  query, 
+  orderBy 
+} from 'firebase/firestore';
 
-type AppView = 'chats' | 'patients' | 'reports' | 'menu';
+const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [currentView, setCurrentView] = useState<AppView>('login');
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
+  
+  // Local state for users (Mock + Session)
+  const [users, setUsers] = useState<UserProfile[]>(() => {
+    try {
+      const saved = localStorage.getItem('slh_users');
+      return saved ? JSON.parse(saved) : MOCK_USERS;
+    } catch (e) {
+      console.error("Failed to parse users from storage", e);
+      return MOCK_USERS;
+    }
+  });
 
-export default function App() {
-  const [user, setUser] = useState<any>(null);
-  const [role, setRole] = useState<'admin' | 'clerk' | 'hcw' | 'guest'>('guest');
-  const [currentView, setCurrentView] = useState<AppView>('chats');
-  const [messages, setMessages] = useState<any[]>([]);
-  const [patients, setPatients] = useState<any[]>([]);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [newMessage, setNewMessage] = useState('');
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
-  // 1. AUTH LOGIC
+  // Persistent Session
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-        const emailLower = currentUser.email?.toLowerCase() || '';
-        if (emailLower.includes('admin')) setRole('admin');
-        else if (emailLower.includes('mreyes')) setRole('clerk');
-        else if (emailLower.includes('jcruz')) setRole('hcw');
-      } else {
-        setUser(null);
+    const savedUser = localStorage.getItem('slh_active_session');
+    if (savedUser) {
+      try {
+        setCurrentUser(JSON.parse(savedUser));
+        setCurrentView('chat_list');
+      } catch (e) {
+        console.error("Failed to parse active session", e);
+        localStorage.removeItem('slh_active_session');
       }
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    }
   }, []);
 
-  // 2. DATA LISTENERS
+  // Sync with Firestore (Cloud Database)
   useEffect(() => {
-    if (!user) return;
-    const qMsg = query(collection(db, "messages"), orderBy("timestamp", "asc"));
-    const unsubMsg = onSnapshot(qMsg, (snapshot) => {
-      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    const qPat = query(collection(db, "patients"));
-    const unsubPat = onSnapshot(qPat, (snapshot) => {
-      setPatients(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => { unsubMsg(); unsubPat(); };
-  }, [user]);
+    if (!currentUser) return;
 
-  // 3. ACTIONS
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    signInWithEmailAndPassword(auth, email, password).catch(err => alert(err.message));
-  };
-
-  const sendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !user) return;
-    try {
-      await addDoc(collection(db, "messages"), {
-        text: newMessage,
-        userId: user.email?.split('@')[0],
-        timestamp: serverTimestamp()
+    // Listen for Patient updates
+    const patientsUnsub = onSnapshot(collection(db, 'patients'), (snapshot) => {
+      const patientData: Patient[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        patientData.push({ ...data as Patient, id: doc.id });
       });
-      setNewMessage('');
-    } catch (err) {
-      console.error("Error sending message:", err);
+      setPatients(patientData);
+    });
+
+    // Listen for Message updates
+    const messagesUnsub = onSnapshot(query(collection(db, 'messages'), orderBy('timestamp', 'asc')), (snapshot) => {
+      const messageData: Message[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        messageData.push({ ...data as Message, id: doc.id });
+      });
+      setMessages(messageData);
+    });
+
+    // Listen for Audit updates
+    const auditUnsub = onSnapshot(query(collection(db, 'audit'), orderBy('timestamp', 'desc')), (snapshot) => {
+      const auditData: AuditLog[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        auditData.push({ ...data as AuditLog, id: doc.id });
+      });
+      setAuditLogs(auditData);
+    });
+
+    return () => {
+      patientsUnsub();
+      messagesUnsub();
+      auditUnsub();
+    };
+  }, [currentUser]);
+
+  // Safe localStorage update
+  useEffect(() => {
+    try {
+      localStorage.setItem('slh_users', JSON.stringify(users));
+    } catch (e) {
+      console.error("Failed to persist users to localStorage. Possible circular structure.", e);
     }
+  }, [users]);
+
+  const totalUnreadCount = useMemo(() => {
+    if (!currentUser) return 0;
+    return messages.filter(m => 
+      m.type !== 'system' && 
+      !m.readBy.includes(currentUser.id) &&
+      patients.find(p => p.id === m.patientId)?.members.includes(currentUser.id)
+    ).length;
+  }, [messages, currentUser, patients]);
+
+  const addAuditLog = useCallback(async (action: AuditLog['action'], details: string, targetId: string) => {
+    if (!currentUser) return;
+    try {
+      await addDoc(collection(db, 'audit'), {
+        userId: currentUser.id,
+        timestamp: new Date().toISOString(),
+        action,
+        details,
+        targetId
+      });
+    } catch (e) {
+      console.error("Audit logging failed:", e);
+    }
+  }, [currentUser]);
+
+  const handleLogin = (user: UserProfile, stayLoggedIn: boolean) => {
+    setCurrentUser(user);
+    if (stayLoggedIn) {
+      try {
+        localStorage.setItem('slh_active_session', JSON.stringify(user));
+      } catch (e) {
+        console.error("Failed to persist session", e);
+      }
+    }
+    setCurrentView('chat_list');
+    addAuditLog('LOGIN', 'Authenticated', user.id);
   };
 
-  if (loading) return (
-    <div className="h-screen flex flex-col items-center justify-center bg-white">
-      <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
-    </div>
-  );
+  const handleSignUp = (newUser: UserProfile) => {
+    setUsers(prev => [...prev, newUser]);
+  };
 
-  if (!user) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-slate-50 p-6">
-        <div className="w-full max-w-sm bg-white p-8 rounded-3xl shadow-xl border border-gray-100 text-center">
-          <h1 className="text-4xl font-black text-purple-600 mb-2 italic">CliniChat</h1>
-          <p className="text-gray-400 text-xs mb-8 uppercase tracking-widest font-bold">SLH Authorized Personnel Only</p>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <input type="email" placeholder="Email" className="w-full p-4 bg-gray-50 border rounded-2xl" value={email} onChange={e => setEmail(e.target.value)} required />
-            <input type="password" placeholder="Password" className="w-full p-4 bg-gray-50 border rounded-2xl" value={password} onChange={e => setPassword(e.target.value)} required />
-            <button className="w-full bg-purple-600 text-white py-4 rounded-2xl font-bold shadow-lg">Sign In</button>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  const handleLogout = () => {
+    localStorage.removeItem('slh_active_session');
+    setCurrentUser(null);
+    setCurrentView('login');
+  };
+
+  const sendMessage = async (msg: Omit<Message, 'id' | 'timestamp' | 'reactions' | 'readBy'>) => {
+    await addDoc(collection(db, 'messages'), {
+      ...msg,
+      timestamp: new Date().toISOString(),
+      reactions: { check: [], cross: [] },
+      readBy: [currentUser!.id],
+    });
+  };
+
+  if (currentView === 'login') return <Login onLogin={handleLogin} onSignUp={handleSignUp} users={users} />;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <header className="sticky top-0 bg-white z-50 border-b border-gray-100 shadow-sm">
-        <div className="flex justify-between items-center px-4 pt-4 pb-2">
-          <h1 className="text-2xl font-black text-purple-600 italic">CliniChat</h1>
-          <div className="flex gap-4 text-gray-400"><span>🔍</span><span>📷</span></div>
-        </div>
-        <nav className="flex justify-around items-end h-12">
-          {[{ id: 'chats', icon: '💬' }, { id: 'patients', icon: '👥' }, { id: 'reports', icon: '📋' }, { id: 'menu', icon: '☰' }].map((tab) => (
-            <button key={tab.id} onClick={() => setCurrentView(tab.id as AppView)}
-              className={`flex-1 flex flex-col items-center pb-2 text-2xl ${currentView === tab.id ? 'text-purple-600 border-b-4 border-purple-600' : 'text-gray-300'}`}
-            >{tab.icon}</button>
-          ))}
-        </nav>
-      </header>
+    <div className="flex h-screen bg-viber-bg dark:bg-viber-dark relative transition-colors duration-300">
+      <div className="hidden md:block w-80 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-viber-dark">
+        <Sidebar currentUser={currentUser!} currentView={currentView} setView={setCurrentView} onLogout={handleLogout} unreadCount={totalUnreadCount} />
+      </div>
 
-      <main className="flex-1 max-w-md mx-auto w-full pb-24 overflow-y-auto">
-        {currentView === 'chats' && (
-          <div className="p-4 space-y-4">
-            {messages.map((msg) => {
-              const isMe = msg.userId === user.email?.split('@')[0];
-              return (
-                <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] p-3 rounded-2xl ${isMe ? 'bg-purple-600 text-white rounded-tr-none' : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'}`}>
-                    {!isMe && <p className="text-[10px] font-black text-purple-500 mb-1 uppercase tracking-tight">{msg.userId}</p>}
-                    <p className="text-sm leading-tight">{msg.text || msg.details}</p>
-                    <p className="text-[8px] mt-1 text-right opacity-60">
-                      {msg.timestamp?.seconds ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Sending...'}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {currentView === 'patients' && (
-          <div className="bg-white min-h-screen p-4">
-            <h2 className="font-bold text-lg mb-4 border-b pb-2">Patient Records</h2>
-            {role === 'clerk' ? <p className="text-gray-400 text-center py-10 italic">Access Restricted</p> : 
-              patients.map(p => (
-                <div key={p.id} className="p-4 border-b flex items-center gap-3 font-bold text-xs text-gray-700">
-                  <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">👤</div>
-                  {p.name || "TEST PATIENT"}
-                </div>
-              ))
-            }
-          </div>
-        )}
-
-        {currentView === 'menu' && (
-          <div className="p-6 space-y-4">
-            <div className="bg-white p-6 rounded-3xl text-center border border-gray-100">
-              <p className="font-bold text-gray-900">{user.email}</p>
-              <p className="text-xs text-purple-600 font-bold uppercase mt-1 tracking-widest">{role} Portal</p>
-            </div>
-            <button onClick={() => signOut(auth)} className="w-full bg-red-50 text-red-600 p-4 rounded-2xl font-bold">Log Out</button>
-          </div>
-        )}
-      </main>
-
-      {currentView === 'chats' && (
-        <form onSubmit={sendMessage} className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t flex items-center gap-2">
-          <input 
-            type="text" 
-            placeholder="Type clinical update..." 
-            className="flex-1 bg-gray-100 p-3 rounded-2xl text-sm outline-none" 
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+      <main className="flex-1 flex flex-col relative overflow-hidden">
+        {currentView === 'chat_list' && <PatientList patients={patients} messages={messages} onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); }} currentUser={currentUser!} setPatients={() => {}} addAuditLog={addAuditLog} />}
+        {currentView === 'thread' && selectedPatientId && (
+          <ChatThread 
+            patient={patients.find(p => p.id === selectedPatientId)!}
+            messages={messages.filter(m => m.patientId === selectedPatientId)}
+            currentUser={currentUser!}
+            onBack={() => setCurrentView('chat_list')}
+            onSendMessage={sendMessage}
+            onUpdatePatient={async (p) => { await updateDoc(doc(db, 'patients', p.id), { ...p }); addAuditLog('EDIT', 'Updated info', p.id); }}
+            onArchive={async () => { await updateDoc(doc(db, 'patients', selectedPatientId), { isArchived: true, dateDischarged: new Date().toISOString().split('T')[0] }); addAuditLog('ARCHIVE', 'Discharged', selectedPatientId); setCurrentView('chat_list'); }}
+            onReadmit={async () => { await updateDoc(doc(db, 'patients', selectedPatientId), { isArchived: false, dateDischarged: null, dateAdmitted: new Date().toISOString().split('T')[0] }); addAuditLog('CREATE', 'Readmitted', selectedPatientId); }}
+            onDeleteMessage={async (id) => { await updateDoc(doc(db, 'messages', id), { content: 'Deleted', type: 'system' }); }}
+            onAddMember={async (uid) => { const p = patients.find(x => x.id === selectedPatientId); if (p) await updateDoc(doc(db, 'patients', selectedPatientId), { members: [...p.members, uid] }); }}
+            onLeaveThread={async () => { const p = patients.find(x => x.id === selectedPatientId); if (p) await updateDoc(doc(db, 'patients', selectedPatientId), { members: p.members.filter(m => m !== currentUser!.id) }); setCurrentView('chat_list'); }}
+            onGenerateSummary={async (p, msgs) => { 
+              const header = `CARE TEAM LOG: ${p.surname}, ${p.firstName} (${p.patientId})\nWard: ${p.ward} | Room: ${p.roomNumber}\nGenerated: ${new Date().toLocaleString()}\n--------------------------------------------------\n\n`;
+              const content = msgs.map(m => {
+                const sender = users.find(u => u.id === m.senderId);
+                const senderName = sender ? `${sender.firstName} ${sender.surname}` : (m.type === 'system' ? 'SYSTEM' : 'Unknown');
+                const date = new Date(m.timestamp).toLocaleString();
+                return `[${date}] ${senderName}: ${m.content}${m.attachmentUrl ? ' (Attachment Included)' : ''}`;
+              }).join('\n');
+              return header + content;
+            }}
+            users={users}
           />
-          <button type="submit" className="bg-purple-600 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg">➔</button>
-        </form>
-      )}
+        )}
+        {currentView === 'contacts' && <Contacts users={users} onBack={() => setCurrentView('chat_list')} currentUser={currentUser!} onDeleteHCW={(id) => setUsers(u => u.filter(x => x.id !== id))} onAddUser={(u) => setUsers(p => [...p, u])} onUpdateUser={(u) => setUsers(p => p.map(x => x.id === u.id ? u : x))} />}
+        {currentView === 'profile' && <UserProfileView user={currentUser!} onSave={(u) => { setCurrentUser(u); setUsers(p => p.map(x => x.id === u.id ? u : x)); }} onBack={() => setCurrentView('chat_list')} onLogout={handleLogout} />}
+        {currentView === 'audit' && currentUser?.role === UserRole.ADMIN && <AuditTrail logs={auditLogs} users={users} onBack={() => setCurrentView('chat_list')} />}
+        {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
+
+        {/* Mobile Navigation */}
+        <div className="md:hidden absolute bottom-0 left-0 right-0 h-16 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 flex justify-around items-center px-4 z-[60]">
+          <button onClick={() => setCurrentView('chat_list')} className={`p-2 ${currentView === 'chat_list' ? 'text-purple-600' : 'text-gray-400'}`}>Threads</button>
+          <button onClick={() => setCurrentView('contacts')} className={`p-2 ${currentView === 'contacts' ? 'text-purple-600' : 'text-gray-400'}`}>Contacts</button>
+          <button onClick={() => setCurrentView('reports')} className={`p-2 ${currentView === 'reports' ? 'text-purple-600' : 'text-gray-400'}`}>Reports</button>
+          <button onClick={() => setCurrentView('profile')} className={`p-2 ${currentView === 'profile' ? 'text-purple-600' : 'text-gray-400'}`}>Profile</button>
+        </div>
+      </main>
+      <div className="fixed bottom-0 right-0 bg-black/50 text-white text-[8px] px-2 py-0.5 rounded-tl-md">DPA 2012 COMPLIANT</div>
     </div>
   );
-}
+};
+
+export default App;
