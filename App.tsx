@@ -3,16 +3,15 @@ import { db, auth } from './firebase-config';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
-type AppView = 'chat_list' | 'contacts' | 'reports' | 'profile';
+type AppView = 'home' | 'contacts' | 'reports' | 'profile' | 'menu';
 
 export default function App() {
   const [user, setUser] = useState<any>(null);
-  const [currentView, setCurrentView] = useState<AppView>('chat_list');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [currentView, setCurrentView] = useState<AppView>('home');
   const [messages, setMessages] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
 
-  // 1. AUTHENTICATION CHECK
+  // 1. AUTH CHECK
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -21,114 +20,108 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. DATABASE CONNECTION (Only runs if user is logged in)
+  // 2. DATA FETCHING (Messages & Patients)
   useEffect(() => {
     if (!user) return;
-
     const q = query(collection(db, "messages"), orderBy("timestamp", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setMessages(msgData);
+      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-
     return () => unsubscribe();
   }, [user]);
 
-  // 3. LOGIN HANDLER (Simple anonymous login for testing)
-  const handleLogin = async () => {
-    try {
-      await signInAnonymously(auth);
-    } catch (error) {
-      console.error("Login failed", error);
-    }
-  };
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-purple-600 font-bold">CliniChat...</div>;
 
-  // 4. VIEW RENDERER
-  const renderView = () => {
-    switch (currentView) {
-      case 'chat_list':
-        return (
-          <div className="space-y-4 px-2">
-            <h2 className="text-xl font-bold text-purple-700 mb-4">Chat History</h2>
-            {messages.map(msg => (
-              <div key={msg.id} className="p-4 bg-white border border-gray-200 rounded-xl shadow-sm">
-                <div className="flex justify-between items-start mb-1">
-                  <h3 className="font-bold text-gray-900">{msg.userId || "Staff Member"}</h3>
-                  <span className="text-[10px] text-gray-400">
-                    {msg.timestamp?.seconds ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString() : "Recent"}
-                  </span>
-                </div>
-                <p className="text-sm text-gray-600">{msg.details || msg.text || "Update logged."}</p>
-              </div>
-            ))}
-          </div>
-        );
-      case 'profile':
-        return (
-          <div className="p-4 text-center">
-            <p className="mb-4">Logged in as: {user?.uid}</p>
-            <button onClick={() => auth.signOut()} className="bg-red-500 text-white px-4 py-2 rounded-lg">Sign Out</button>
-          </div>
-        );
-      default:
-        return <div className="p-4 text-center text-gray-500 italic">Section under construction.</div>;
-    }
-  };
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center text-purple-600 font-bold text-xl">CliniChat...</div>;
-
-  // 5. LOGIN SCREEN
   if (!user) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
-        <div className="w-full max-w-sm bg-white p-8 rounded-2xl shadow-xl border border-gray-100 text-center">
-          <div className="w-20 h-20 bg-purple-600 rounded-2xl mx-auto mb-6 flex items-center justify-center text-white text-4xl font-bold">C</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to CliniChat</h1>
-          <p className="text-gray-500 mb-8">Secure clinical communication</p>
-          <button 
-            onClick={handleLogin}
-            className="w-full bg-purple-600 text-white py-4 rounded-xl font-bold hover:bg-purple-700 transition-colors shadow-lg shadow-purple-200"
-          >
-            Enter Secure Portal
-          </button>
-        </div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-6">
+        <h1 className="text-4xl font-black text-purple-600 mb-8">CliniChat</h1>
+        <button 
+          onClick={() => signInAnonymously(auth)}
+          className="w-full max-w-xs bg-purple-600 text-white py-3 rounded-lg font-bold shadow-lg"
+        >
+          Log In
+        </button>
       </div>
     );
   }
 
-  // 6. MAIN APP UI (Only shown if logged in)
+  // 3. FACEBOOK-STYLE VIEW RENDERER
+  const renderView = () => {
+    switch (currentView) {
+      case 'home':
+        return (
+          <div className="divide-y divide-gray-200">
+            {messages.map(msg => (
+              <div key={msg.id} className="bg-white p-4 mb-2 shadow-sm">
+                <div className="flex items-center mb-2">
+                  <div className="w-10 h-10 bg-gray-200 rounded-full mr-3"></div>
+                  <div>
+                    <p className="font-bold text-gray-900">{msg.userId || "Healthcare Worker"}</p>
+                    <p className="text-xs text-gray-500">Just now • 🌍</p>
+                  </div>
+                </div>
+                <p className="text-gray-800 text-sm">{msg.details || msg.text || "Updated clinical status."}</p>
+              </div>
+            ))}
+          </div>
+        );
+      case 'contacts':
+        return <div className="p-10 text-center text-gray-500">Patient Directory</div>;
+      case 'menu':
+        return (
+          <div className="p-4 bg-gray-100 min-h-screen">
+            <h2 className="text-2xl font-bold mb-4">Menu</h2>
+            <div className="grid grid-cols-2 gap-3">
+              <button className="bg-white p-4 rounded-xl shadow-sm font-bold text-left">🏥 Reports</button>
+              <button className="bg-white p-4 rounded-xl shadow-sm font-bold text-left">⚙️ Settings</button>
+              <button onClick={() => auth.signOut()} className="bg-white p-4 rounded-xl shadow-sm font-bold text-left text-red-500">Log Out</button>
+            </div>
+          </div>
+        );
+      default:
+        return <div className="p-10 text-center">Coming Soon</div>;
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="fixed top-0 left-0 right-0 h-16 bg-purple-600 text-white flex items-center px-4 z-[100] shadow-lg">
-        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="p-2 bg-purple-700 rounded-lg flex flex-col gap-1">
-          <div className="w-6 h-0.5 bg-white"></div>
-          <div className="w-6 h-0.5 bg-white"></div>
-          <div className="w-6 h-0.5 bg-white"></div>
-        </button>
-        <span className="ml-4 font-bold text-xl">CliniChat</span>
+    <div className="min-h-screen bg-gray-100 pb-20">
+      {/* TOP HEADER */}
+      <header className="sticky top-0 bg-white border-b border-gray-200 z-50">
+        <div className="flex justify-between items-center px-4 py-2">
+          <h1 className="text-2xl font-black text-purple-600 tracking-tighter">CliniChat</h1>
+          <div className="flex gap-2">
+            <button className="p-2 bg-gray-100 rounded-full">🔍</button>
+            <button className="p-2 bg-gray-100 rounded-full">💬</button>
+          </div>
+        </div>
+
+        {/* NAVIGATION TABS (Facebook Style) */}
+        <nav className="flex justify-around items-center border-t border-gray-100">
+          {[
+            { id: 'home', icon: '🏠' },
+            { id: 'contacts', icon: '👥' },
+            { id: 'reports', icon: '📋' },
+            { id: 'profile', icon: '👤' },
+            { id: 'menu', icon: '☰' }
+          ].map((tab) => (
+            <button 
+              key={tab.id}
+              onClick={() => setCurrentView(tab.id as AppView)}
+              className={`flex-1 py-3 text-2xl transition-all ${
+                currentView === tab.id 
+                ? 'text-purple-600 border-b-4 border-purple-600' 
+                : 'text-gray-400'
+              }`}
+            >
+              {tab.icon}
+            </button>
+          ))}
+        </nav>
       </header>
 
-      {isMenuOpen && (
-        <div className="fixed inset-0 z-[110]">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setIsMenuOpen(false)} />
-          <nav className="absolute top-16 left-0 w-72 h-full bg-white shadow-2xl py-6 animate-in slide-in-from-left duration-200">
-            {['chat_list', 'contacts', 'reports', 'profile'].map((view) => (
-              <button 
-                key={view}
-                onClick={() => {setCurrentView(view as AppView); setIsMenuOpen(false);}} 
-                className={`w-full text-left px-8 py-4 capitalize ${currentView === view ? 'bg-purple-50 text-purple-600 font-bold border-r-4 border-purple-600' : 'text-gray-700'}`}
-              >
-                {view.replace('_', ' ')}
-              </button>
-            ))}
-          </nav>
-        </div>
-      )}
-
-      <main className="pt-20 pb-12 max-w-2xl mx-auto">
+      {/* MAIN FEED */}
+      <main className="max-w-md mx-auto">
         {renderView()}
       </main>
     </div>
