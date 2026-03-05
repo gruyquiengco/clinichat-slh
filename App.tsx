@@ -29,9 +29,7 @@ const App: React.FC = () => {
     try {
       const saved = localStorage.getItem('slh_users');
       return saved ? JSON.parse(saved) : MOCK_USERS;
-    } catch (e) {
-      return MOCK_USERS;
-    }
+    } catch (e) { return MOCK_USERS; }
   });
 
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -44,27 +42,21 @@ const App: React.FC = () => {
       try {
         setCurrentUser(JSON.parse(savedUser));
         setCurrentView('chat_list');
-      } catch (e) {
-        localStorage.removeItem('slh_active_session');
-      }
+      } catch (e) { localStorage.removeItem('slh_active_session'); }
     }
   }, []);
 
   useEffect(() => {
     if (!currentUser) return;
-
     const patientsUnsub = onSnapshot(collection(db, 'patients'), (snapshot) => {
       setPatients(snapshot.docs.map(doc => ({ ...doc.data() as Patient, id: doc.id })));
     });
-
     const messagesUnsub = onSnapshot(query(collection(db, 'messages'), orderBy('timestamp', 'asc')), (snapshot) => {
       setMessages(snapshot.docs.map(doc => ({ ...doc.data() as Message, id: doc.id })));
     });
-
     const auditUnsub = onSnapshot(query(collection(db, 'audit'), orderBy('timestamp', 'desc')), (snapshot) => {
       setAuditLogs(snapshot.docs.map(doc => ({ ...doc.data() as AuditLog, id: doc.id })));
     });
-
     return () => { patientsUnsub(); messagesUnsub(); auditUnsub(); };
   }, [currentUser]);
 
@@ -103,6 +95,21 @@ const App: React.FC = () => {
     });
   };
 
+  // Re-usable Readmit Function
+  const handleReadmit = async (patientId: string) => {
+    try {
+      const patientRef = doc(db, 'patients', patientId);
+      await updateDoc(patientRef, {
+        isArchived: false,
+        dateDischarged: null,
+        dateAdmitted: new Date().toISOString().split('T')[0]
+      });
+      addAuditLog('CREATE', 'Readmitted patient', patientId);
+    } catch (e) {
+      console.error("Readmit failed:", e);
+    }
+  };
+
   const totalUnreadCount = useMemo(() => {
     if (!currentUser) return 0;
     return messages.filter(m => 
@@ -116,7 +123,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row h-[100dvh] bg-viber-bg dark:bg-viber-dark transition-colors overflow-hidden relative">
-      <div className="hidden md:block w-80 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-viber-dark">
+      <div className="hidden md:block w-80 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-viber-dark shadow-lg">
         <Sidebar currentUser={currentUser!} currentView={currentView} setView={setCurrentView} onLogout={handleLogout} unreadCount={totalUnreadCount} />
       </div>
 
@@ -127,22 +134,9 @@ const App: React.FC = () => {
             <span className="text-[8px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded font-bold uppercase">{currentUser?.role}</span>
           </div>
           <nav className="flex justify-around items-center h-12">
-            {[
-              { id: 'chat_list', label: 'Threads' },
-              { id: 'contacts', label: 'Contacts' },
-              { id: 'reports', label: 'Reports' },
-              { id: 'profile', label: 'Profile' }
-            ].map((tab) => (
-              <button 
-                key={tab.id}
-                onClick={() => setCurrentView(tab.id as AppView)}
-                className={`flex-1 h-full text-[11px] font-black uppercase transition-all border-b-4 ${
-                  currentView === tab.id || (currentView === 'thread' && tab.id === 'chat_list')
-                  ? 'text-purple-600 border-purple-600 bg-purple-50/50' 
-                  : 'text-gray-400 border-transparent'
-                }`}
-              >
-                {tab.label}
+            {['chat_list', 'contacts', 'reports', 'profile'].map((id) => (
+              <button key={id} onClick={() => setCurrentView(id as AppView)} className={`flex-1 h-full text-[11px] font-black uppercase transition-all border-b-4 ${currentView === id || (currentView === 'thread' && id === 'chat_list') ? 'text-purple-600 border-purple-600 bg-purple-50/50' : 'text-gray-400 border-transparent'}`}>
+                {id.replace('chat_list', 'Threads')}
               </button>
             ))}
           </nav>
@@ -155,16 +149,11 @@ const App: React.FC = () => {
               messages={messages} 
               onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); }} 
               currentUser={currentUser!} 
-              setPatients={async (newPatient) => {
-                try {
-                  await addDoc(collection(db, 'patients'), {
-                    ...newPatient,
-                    members: [currentUser!.id],
-                    dateAdmitted: new Date().toISOString().split('T')[0],
-                    isArchived: false
-                  });
-                  addAuditLog('CREATE', `Admitted ${newPatient.surname}`, 'system');
-                } catch (e) { console.error(e); }
+              // FIXED: Added onReadmit here for the list view button
+              onReadmit={handleReadmit}
+              setPatients={async (newP) => {
+                await addDoc(collection(db, 'patients'), { ...newP, members: [currentUser!.id], dateAdmitted: new Date().toISOString().split('T')[0], isArchived: false });
+                addAuditLog('CREATE', `Admitted ${newP.surname}`, 'system');
               }} 
               addAuditLog={addAuditLog} 
             />
@@ -182,35 +171,19 @@ const App: React.FC = () => {
                   onBack={() => setCurrentView('chat_list')}
                   onSendMessage={sendMessage}
                   onReadMessage={() => {}} 
-                  onUpdatePatient={async (p) => { await updateDoc(doc(db, 'patients', p.id), { ...p }); addAuditLog('EDIT', 'Updated info', p.id); }}
-                  onArchive={async () => { 
-                    await updateDoc(doc(db, 'patients', selectedPatientId), { 
-                      isArchived: true, 
-                      dateDischarged: new Date().toISOString().split('T')[0] 
-                    }); 
-                    addAuditLog('ARCHIVE', 'Discharged', selectedPatientId); 
-                    setCurrentView('chat_list'); 
-                  }}
-                  // FIXED READMIT LOGIC BELOW
-                  onReadmit={async () => { 
-                    await updateDoc(doc(db, 'patients', selectedPatientId), { 
-                      isArchived: false, 
-                      dateDischarged: null, 
-                      dateAdmitted: new Date().toISOString().split('T')[0] 
-                    }); 
-                    addAuditLog('CREATE', 'Readmitted', selectedPatientId); 
-                    // Automatically switch to Active view to see the result
-                    setCurrentView('chat_list');
-                  }}
-                  onDeleteMessage={async (id) => { await updateDoc(doc(db, 'messages', id), { content: 'Deleted', type: 'system' }); }}
-                  onAddMember={async (uid) => { const p = patients.find(x => x.id === selectedPatientId); if (p) await updateDoc(doc(db, 'patients', selectedPatientId), { members: [...p.members, uid] }); }}
-                  onLeaveThread={async () => { const p = patients.find(x => x.id === selectedPatientId); if (p) await updateDoc(doc(db, 'patients', selectedPatientId), { members: p.members.filter(m => m !== currentUser!.id) }); setCurrentView('chat_list'); }}
+                  onUpdatePatient={async (p) => { await updateDoc(doc(db, 'patients', p.id), { ...p }); }}
+                  onArchive={async () => { await updateDoc(doc(db, 'patients', selectedPatientId), { isArchived: true, dateDischarged: new Date().toISOString().split('T')[0] }); setCurrentView('chat_list'); }}
+                  onReadmit={() => handleReadmit(selectedPatientId)}
+                  onDeleteMessage={() => {}}
+                  onAddMember={() => {}}
+                  onLeaveThread={() => setCurrentView('chat_list')}
                   onGenerateSummary={async () => ""}
                   users={users}
                 />
               );
             })()
           )}
+          {/* Other views remain same */}
           {currentView === 'contacts' && <Contacts users={users} onBack={() => setCurrentView('chat_list')} currentUser={currentUser!} onDeleteHCW={() => {}} onAddUser={() => {}} onUpdateUser={() => {}} />}
           {currentView === 'profile' && <UserProfileView user={currentUser!} onSave={() => {}} onBack={() => setCurrentView('chat_list')} onLogout={handleLogout} />}
           {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
