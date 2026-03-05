@@ -38,6 +38,7 @@ const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
+  // Session Management
   useEffect(() => {
     const savedUser = localStorage.getItem('slh_active_session');
     if (savedUser) {
@@ -50,19 +51,23 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Real-time Firestore Sync
   useEffect(() => {
     if (!currentUser) return;
 
     const patientsUnsub = onSnapshot(collection(db, 'patients'), (snapshot) => {
-      setPatients(snapshot.docs.map(doc => ({ ...doc.data() as Patient, id: doc.id })));
+      const pData = snapshot.docs.map(doc => ({ ...doc.data() as Patient, id: doc.id }));
+      setPatients(pData);
     });
 
     const messagesUnsub = onSnapshot(query(collection(db, 'messages'), orderBy('timestamp', 'asc')), (snapshot) => {
-      setMessages(snapshot.docs.map(doc => ({ ...doc.data() as Message, id: doc.id })));
+      const mData = snapshot.docs.map(doc => ({ ...doc.data() as Message, id: doc.id }));
+      setMessages(mData);
     });
 
     const auditUnsub = onSnapshot(query(collection(db, 'audit'), orderBy('timestamp', 'desc')), (snapshot) => {
-      setAuditLogs(snapshot.docs.map(doc => ({ ...doc.data() as AuditLog, id: doc.id })));
+      const aData = snapshot.docs.map(doc => ({ ...doc.data() as AuditLog, id: doc.id }));
+      setAuditLogs(aData);
     });
 
     return () => { patientsUnsub(); messagesUnsub(); auditUnsub(); };
@@ -95,11 +100,12 @@ const App: React.FC = () => {
   };
 
   const sendMessage = async (msg: Omit<Message, 'id' | 'timestamp' | 'reactions' | 'readBy'>) => {
+    if (!currentUser) return;
     await addDoc(collection(db, 'messages'), {
       ...msg,
       timestamp: new Date().toISOString(),
       reactions: { check: [], cross: [] },
-      readBy: [currentUser!.id],
+      readBy: [currentUser.id],
     });
   };
 
@@ -115,17 +121,20 @@ const App: React.FC = () => {
   if (currentView === 'login') return <Login onLogin={handleLogin} onSignUp={(u) => setUsers(p => [...p, u])} users={users} />;
 
   return (
-    <div className="flex flex-col md:flex-row h-[100dvh] bg-viber-bg dark:bg-viber-dark transition-colors overflow-hidden relative">
-      <div className="hidden md:block w-80 border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-viber-dark">
+    <div className="flex flex-col md:flex-row h-[100dvh] bg-gray-50 dark:bg-viber-dark transition-colors overflow-hidden">
+      
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block w-80 border-r border-gray-200 dark:border-gray-800 bg-white">
         <Sidebar currentUser={currentUser!} currentView={currentView} setView={setCurrentView} onLogout={handleLogout} unreadCount={totalUnreadCount} />
       </div>
 
-      <main className="flex-1 flex flex-col relative overflow-hidden">
-        {/* MOBILE TOP NAV */}
-        <header className="md:hidden bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 z-50">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
+        
+        {/* Mobile Header & Top Nav */}
+        <header className="md:hidden flex flex-col bg-white dark:bg-gray-900 border-b border-gray-200 z-[100]">
           <div className="px-4 pt-3 pb-1 flex justify-between items-center">
             <h1 className="text-xl font-black text-purple-600 italic">CliniChat</h1>
-            <span className="text-[8px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded font-bold uppercase">{currentUser?.role}</span>
+            <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded font-bold uppercase">{currentUser?.role}</span>
           </div>
           <nav className="flex justify-around items-center h-12">
             {[
@@ -137,9 +146,9 @@ const App: React.FC = () => {
               <button 
                 key={tab.id}
                 onClick={() => setCurrentView(tab.id as AppView)}
-                className={`flex-1 h-full text-[11px] font-black uppercase transition-all border-b-4 ${
+                className={`flex-1 h-full text-[11px] font-bold transition-all border-b-2 ${
                   currentView === tab.id || (currentView === 'thread' && tab.id === 'chat_list')
-                  ? 'text-purple-600 border-purple-600 bg-purple-50/50' 
+                  ? 'text-purple-600 border-purple-600' 
                   : 'text-gray-400 border-transparent'
                 }`}
               >
@@ -149,14 +158,14 @@ const App: React.FC = () => {
           </nav>
         </header>
 
-        <div className="flex-1 overflow-hidden relative">
+        {/* Content Area - min-h-0 and flex-1 are vital for mobile scrolling */}
+        <div className="flex-1 min-h-0 overflow-hidden relative">
           {currentView === 'chat_list' && (
             <PatientList 
               patients={patients} 
               messages={messages} 
               onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); }} 
               currentUser={currentUser!} 
-              // RESTORED: Functional Admit Patient Logic
               setPatients={async (newPatient) => {
                 try {
                   await addDoc(collection(db, 'patients'), {
@@ -166,9 +175,7 @@ const App: React.FC = () => {
                     isArchived: false
                   });
                   addAuditLog('CREATE', `Admitted ${newPatient.surname}`, 'system');
-                } catch (e) {
-                  console.error("Firebase Add Error:", e);
-                }
+                } catch (e) { console.error(e); }
               }} 
               addAuditLog={addAuditLog} 
             />
@@ -177,7 +184,7 @@ const App: React.FC = () => {
           {currentView === 'thread' && selectedPatientId && (
             (() => {
               const activePatient = patients.find(p => p.id === selectedPatientId);
-              if (!activePatient) return <div className="p-10 text-center text-gray-400">Loading thread...</div>;
+              if (!activePatient) return <div className="p-10 text-center text-gray-400">Searching for patient data...</div>;
               return (
                 <ChatThread 
                   patient={activePatient}
@@ -198,12 +205,13 @@ const App: React.FC = () => {
               );
             })()
           )}
+          
           {currentView === 'contacts' && <Contacts users={users} onBack={() => setCurrentView('chat_list')} currentUser={currentUser!} onDeleteHCW={() => {}} onAddUser={() => {}} onUpdateUser={() => {}} />}
           {currentView === 'profile' && <UserProfileView user={currentUser!} onSave={() => {}} onBack={() => setCurrentView('chat_list')} onLogout={handleLogout} />}
           {currentView === 'reports' && <Reports patients={patients} logs={auditLogs} users={users} currentUser={currentUser!} onBack={() => setCurrentView('chat_list')} addAuditLog={addAuditLog} />}
         </div>
       </main>
-      <div className="fixed bottom-0 right-0 bg-black/50 text-white text-[7px] px-2 py-0.5 rounded-tl-md z-[100]">DPA 2012 COMPLIANT</div>
+      <div className="fixed bottom-0 right-0 bg-black/50 text-white text-[7px] px-2 py-0.5 z-[200]">DPA 2012 COMPLIANT</div>
     </div>
   );
 };
