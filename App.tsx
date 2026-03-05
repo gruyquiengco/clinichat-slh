@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase-config';
-import { collection, doc, setDoc, updateDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, onSnapshot, query } from 'firebase/firestore';
 import { UserProfile, Patient, Message } from './types';
 import Login from './components/Login';
 import PatientList from './components/PatientList';
@@ -12,33 +12,37 @@ const App: React.FC = () => {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
 
-  // Sync Users and Patients from Firestore
+  // EMERGENCY SYNC: This creates the admin account in your new database automatically
   useEffect(() => {
-    const qUsers = query(collection(db, 'users'));
-    const unsubUsers = onSnapshot(qUsers, (snap) => {
+    const createAdmin = async () => {
+      const adminUser = {
+        id: 'admin_001',
+        email: 'admin@slh.com',
+        password: 'password123',
+        firstName: 'System',
+        surname: 'Admin',
+        role: 'ADMIN',
+        specialization: 'IT'
+      };
+      await setDoc(doc(db, 'users', 'admin_001'), adminUser, { merge: true });
+    };
+    createAdmin();
+  }, []);
+
+  useEffect(() => {
+    const unsubUsers = onSnapshot(query(collection(db, 'users')), (snap) => {
       setUsers(snap.docs.map(d => ({ id: d.id, ...d.data() } as UserProfile)));
     });
-
-    const qPatients = query(collection(db, 'patients'));
-    const unsubPatients = onSnapshot(qPatients, (snap) => {
+    const unsubPatients = onSnapshot(query(collection(db, 'patients')), (snap) => {
       setPatients(snap.docs.map(d => ({ id: d.id, ...d.data() } as Patient)));
     });
-
     return () => { unsubUsers(); unsubPatients(); };
   }, []);
 
   const handleLogin = (user: UserProfile) => {
     setCurrentUser(user);
     setCurrentView('chat_list');
-  };
-
-  const handleSignUp = async (newUser: UserProfile) => {
-    try {
-      await setDoc(doc(db, 'users', newUser.id), newUser);
-      alert("Account created! You can now sign in.");
-    } catch (e) { console.error(e); }
   };
 
   const handleReadmit = async (id: string) => {
@@ -53,7 +57,7 @@ const App: React.FC = () => {
   return (
     <div className="h-screen w-full max-w-md mx-auto bg-white shadow-2xl overflow-hidden flex flex-col">
       {currentView === 'login' && (
-        <Login onLogin={handleLogin} onSignUp={handleSignUp} users={users} />
+        <Login onLogin={handleLogin} users={users} />
       )}
       
       {currentView === 'chat_list' && currentUser && (
@@ -73,7 +77,7 @@ const App: React.FC = () => {
           patient={patients.find(p => p.id === selectedPatientId)}
           currentUser={currentUser}
           users={users}
-          messages={messages.filter(m => m.patientId === selectedPatientId)}
+          messages={[]} // Messages sync can be added next
           onBack={() => setCurrentView('chat_list')}
         />
       )}
