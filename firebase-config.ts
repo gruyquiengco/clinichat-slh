@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth"; // Add this line
+import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage"; // Added for Media
 
 const firebaseConfig = {
   apiKey: "AIzaSyAVDlpJswapXPm-bdmhMee6d1zEA73l63U",
@@ -14,6 +15,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// Export both db and auth
-export const db = getFirestore(app, "clinchat-slh");
-export const auth = getAuth(app); // Add this line
+export const db = getFirestore(app);
+export const auth = getAuth(app);
+export const storage = getStorage(app); // Added for Media

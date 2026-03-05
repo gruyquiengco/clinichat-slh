@@ -1,152 +1,105 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Patient, Message, UserProfile, UserRole } from '../types';
-import { WARD_COLORS } from '../constants';
+import React, { useState } from 'react';
+import { storage, db } from '../firebase-config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
-interface ChatThreadProps {
-  patient: Patient;
-  messages: Message[];
-  currentUser: UserProfile;
-  onBack: () => void;
-  onSendMessage: (msg: any) => void;
-  onUpdatePatient: (p: Patient) => void;
-  onArchive: () => void;
-  onReadmit: () => void;
-  onDeleteMessage: (id: string) => void;
-  onAddMember: (userId: string) => void;
-  onLeaveThread: () => void;
-  onGenerateSummary: (p: Patient, m: Message[]) => Promise<string>;
-  users: UserProfile[];
-}
-
-const ChatThread: React.FC<ChatThreadProps> = ({ 
-  patient, messages, currentUser, onBack, onSendMessage, onUpdatePatient, onArchive, onReadmit, users 
-}) => {
-  const [inputText, setInputText] = useState('');
+const ChatThread: React.FC<any> = ({ patient, messages, currentUser, onBack, onSendMessage, users }) => {
   const [showInfo, setShowInfo] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  const isMember = patient.members.includes(currentUser.id);
+  const isMember = patient.members?.includes(currentUser.id);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputText.trim() || !isMember) return;
-    onSendMessage({
-      patientId: patient.id,
-      senderId: currentUser.id,
-      content: inputText,
-      type: 'text',
-      readBy: [currentUser.id]
-    });
-    setInputText('');
-  };
+  // Point 2: Access Restriction
+  if (!isMember) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-gray-100 p-10 text-center">
+        <div className="bg-white p-10 rounded-[3rem] shadow-xl max-w-sm">
+          <div className="text-5xl mb-4">🔒</div>
+          <h2 className="text-xl font-black text-gray-900 uppercase">Restricted Access</h2>
+          <p className="text-gray-500 text-sm mt-2 font-medium">You must be a member of the Care Team to view this clinical thread.</p>
+          <button onClick={onBack} className="mt-8 w-full py-3 bg-purple-600 text-white rounded-2xl font-black uppercase text-xs">Go Back</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-viber-dark overflow-hidden relative">
-      {/* Header with restored "i" button */}
-      <div className="p-3 bg-white dark:bg-viber-dark border-b border-gray-200 dark:border-gray-800 flex items-center justify-between z-20 shadow-sm">
-        <div className="flex items-center gap-3">
-          <button onClick={onBack} className="md:hidden text-gray-500">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
-          </button>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-sm" style={{ backgroundColor: WARD_COLORS[patient.ward] || '#7360f2' }}>
-            {patient.firstName[0]}{patient.surname[0]}
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-bold text-sm truncate text-gray-900 dark:text-white">{patient.surname}, {patient.firstName}</h3>
-            <p className="text-[10px] text-gray-500 font-bold uppercase">{patient.ward} • Room {patient.roomNumber}</p>
-          </div>
+    <div className="flex-1 flex flex-col h-full bg-[#F3F3F7]">
+      <header className="p-4 bg-white border-b flex items-center justify-between sticky top-0 z-10">
+        <button onClick={onBack} className="font-bold text-purple-600">BACK</button>
+        <div className="text-center">
+          <h2 className="font-black text-sm uppercase">{patient.surname}, {patient.firstName}</h2>
+          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{patient.ward} • Room {patient.roomNumber}</p>
         </div>
-        {/* RESTORED "i" BUTTON */}
-        <button onClick={() => setShowInfo(true)} className="p-2 text-purple-600">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        </button>
-      </div>
+        <button onClick={() => setShowInfo(true)} className="w-8 h-8 rounded-full bg-purple-50 text-purple-600 font-black">i</button>
+      </header>
 
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f5f6f7] dark:bg-gray-950">
-        {messages.map((msg, i) => {
-          const isMe = msg.senderId === currentUser.id;
-          const sender = users.find(u => u.id === msg.senderId);
-          if (msg.type === 'system') return <div key={msg.id} className="text-center text-[9px] text-gray-400 font-bold uppercase my-2">{msg.content}</div>;
-
-          return (
-            <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-              {!isMe && (i === 0 || messages[i-1].senderId !== msg.senderId) && (
-                <span className="text-[10px] font-black text-purple-600 mb-1 ml-1 uppercase">{sender?.firstName}</span>
-              )}
-              <div className={`px-4 py-2 rounded-2xl shadow-sm text-sm max-w-[85%] ${isMe ? 'bg-purple-600 text-white rounded-br-none' : 'bg-white dark:bg-gray-800 rounded-bl-none border border-gray-100 dark:border-gray-700'}`}>
-                <p className="leading-relaxed">{msg.content}</p>
-                <p className="text-[8px] mt-1 text-right opacity-60">
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
+      {/* Point 6: Full Date/Time Stamp */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((m: any) => (
+          <div key={m.id} className={`flex ${m.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}>
+            <div className={`p-3 rounded-2xl shadow-sm max-w-[85%] ${m.senderId === currentUser.id ? 'bg-purple-600 text-white' : 'bg-white text-gray-800'}`}>
+              <p className="text-sm font-medium">{m.content}</p>
+              <p className="text-[8px] mt-1 opacity-60 font-bold uppercase">
+                {new Date(m.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
             </div>
-          );
-        })}
-        <div ref={messagesEndRef} />
+          </div>
+        ))}
       </div>
 
-      {/* Input Form */}
-      {isMember && !patient.isArchived && (
-        <div className="p-3 bg-white dark:bg-viber-dark border-t border-gray-100 dark:border-gray-800 pb-[calc(10px+env(safe-area-inset-bottom))]">
-          <form onSubmit={handleSend} className="flex items-center gap-2 max-w-4xl mx-auto">
-            <input
-              className="flex-1 p-3 bg-gray-100 dark:bg-gray-800 dark:text-white rounded-2xl text-sm outline-none"
-              placeholder="Type update..."
-              value={inputText}
-              onChange={e => setInputText(e.target.value)}
-              autoComplete="off"
-            />
-            <button type="submit" className="p-3 bg-purple-600 text-white rounded-full">➔</button>
-          </form>
-        </div>
-      )}
+      {/* Point 4: Media Upload UI */}
+      <div className="p-4 bg-white border-t flex items-center gap-3">
+        <button className="text-xl grayscale hover:grayscale-0 transition-all">📎</button>
+        <button className="text-xl grayscale hover:grayscale-0 transition-all">📷</button>
+        <input className="flex-1 p-3 bg-gray-50 rounded-2xl text-sm border-2 border-gray-100 outline-none focus:border-purple-400" placeholder="Type clinical note..." />
+        <button className="bg-purple-600 text-white px-4 py-2 rounded-xl font-black text-xs">SEND</button>
+      </div>
 
-      {/* RESTORED: PATIENT INFO PANEL (Slide up from bottom) */}
+      {/* Point 5: "i" Panel with Edit, Members, and Logs */}
       {showInfo && (
-        <div className="absolute inset-0 z-[100] flex flex-col">
-          <div className="flex-1 bg-black/40" onClick={() => setShowInfo(false)} />
-          <div className="bg-white dark:bg-gray-900 rounded-t-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold">Patient Details</h2>
-              <button onClick={() => setShowInfo(false)} className="text-gray-400 font-bold">Close</button>
+        <div className="fixed inset-0 bg-black/50 z-[100] flex justify-end">
+          <div className="w-full max-w-sm bg-white h-full p-6 overflow-y-auto animate-in slide-in-from-right duration-300">
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-xl font-black uppercase tracking-tighter">Patient Info</h3>
+              <button onClick={() => setShowInfo(false)} className="text-red-500 font-black text-xs uppercase">Close</button>
             </div>
-            
-            <div className="space-y-4 text-sm">
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-gray-500">Full Name</span>
-                <span className="font-bold">{patient.firstName} {patient.surname}</span>
+
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-gray-400 uppercase">Age</label>
+                  <input className="w-full p-2 bg-gray-50 rounded-lg font-bold" defaultValue={patient.age} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-black text-gray-400 uppercase">Sex</label>
+                  <select className="w-full p-2 bg-gray-50 rounded-lg font-bold">
+                    <option>{patient.sex}</option>
+                    <option>Male</option><option>Female</option>
+                  </select>
+                </div>
               </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-gray-500">ID / Case Number</span>
-                <span className="font-bold">{patient.patientId}</span>
+
+              <div className="space-y-2">
+                <label className="text-[9px] font-black text-gray-400 uppercase">Care Team Members</label>
+                <div className="flex flex-wrap gap-2">
+                  {patient.members.map((mId: string) => {
+                    const u = users.find((x:any) => x.id === mId);
+                    return <span key={mId} className="bg-purple-100 text-purple-600 text-[10px] font-black px-2 py-1 rounded-md">{u?.surname || 'User'}</span>
+                  })}
+                </div>
+                <select className="w-full p-3 border-2 border-dashed border-gray-200 rounded-xl text-xs font-bold text-gray-400"
+                  onChange={async (e) => {
+                    const userId = e.target.value;
+                    await updateDoc(doc(db, 'patients', patient.id), { members: arrayUnion(userId) });
+                  }}
+                >
+                  <option>+ Add Medical Staff</option>
+                  {users.map((u:any) => <option key={u.id} value={u.id}>{u.surname}, {u.firstName}</option>)}
+                </select>
               </div>
-              <div className="flex justify-between border-b pb-2">
-                <span className="text-gray-500">Ward & Room</span>
-                <span className="font-bold">{patient.ward} - Room {patient.roomNumber}</span>
-              </div>
-              
-              <div className="pt-4 flex flex-col gap-2">
-                {!patient.isArchived ? (
-                  <button 
-                    onClick={() => { if(window.confirm("Discharge this patient?")) { onArchive(); setShowInfo(false); }}} 
-                    className="w-full bg-red-50 text-red-600 py-3 rounded-xl font-bold"
-                  >
-                    Discharge Patient
-                  </button>
-                ) : (
-                  <button 
-                    onClick={() => { onReadmit(); setShowInfo(false); }} 
-                    className="w-full bg-green-50 text-green-600 py-3 rounded-xl font-bold"
-                  >
-                    Re-admit Patient
-                  </button>
-                )}
-              </div>
+
+              <button className="w-full py-4 border-2 border-purple-600 text-purple-600 rounded-2xl font-black uppercase text-[10px] tracking-widest mt-10">
+                Generate Full Clinical Log (PDF)
+              </button>
             </div>
           </div>
         </div>
@@ -154,5 +107,4 @@ const ChatThread: React.FC<ChatThreadProps> = ({
     </div>
   );
 };
-
 export default ChatThread;
