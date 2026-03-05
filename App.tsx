@@ -150,7 +150,30 @@ const App: React.FC = () => {
         </header>
 
         <div className="flex-1 overflow-hidden relative">
-          {currentView === 'chat_list' && <PatientList patients={patients} messages={messages} onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); }} currentUser={currentUser!} setPatients={() => {}} addAuditLog={addAuditLog} />}
+          {currentView === 'chat_list' && (
+            <PatientList 
+              patients={patients} 
+              messages={messages} 
+              onSelect={(id) => { setSelectedPatientId(id); setCurrentView('thread'); }} 
+              currentUser={currentUser!} 
+              // RESTORED: Functional Admit Patient Logic
+              setPatients={async (newPatient) => {
+                try {
+                  await addDoc(collection(db, 'patients'), {
+                    ...newPatient,
+                    members: [currentUser!.id],
+                    dateAdmitted: new Date().toISOString().split('T')[0],
+                    isArchived: false
+                  });
+                  addAuditLog('CREATE', `Admitted ${newPatient.surname}`, 'system');
+                } catch (e) {
+                  console.error("Firebase Add Error:", e);
+                }
+              }} 
+              addAuditLog={addAuditLog} 
+            />
+          )}
+
           {currentView === 'thread' && selectedPatientId && (
             (() => {
               const activePatient = patients.find(p => p.id === selectedPatientId);
