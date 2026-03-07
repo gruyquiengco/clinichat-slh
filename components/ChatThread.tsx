@@ -1,81 +1,71 @@
 import React, { useState } from 'react';
-import { db } from '../firebase-config';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { Patient, UserProfile, Message } from '../types';
 
-const ChatThread: React.FC<any> = ({ patient, messages, currentUser, onBack, users }) => {
-  const [showInfo, setShowInfo] = useState(false);
+interface ChatThreadProps {
+  patient?: Patient;
+  currentUser: UserProfile;
+  users: UserProfile[];
+  messages: Message[];
+  onBack: () => void;
+  onSendMessage: (content: string) => void;
+}
 
-  if (!patient) return null;
-  const isMember = patient.members?.includes(currentUser.id);
+const ChatThread: React.FC<ChatThreadProps> = ({ patient, currentUser, users, messages, onBack, onSendMessage }) => {
+  const [input, setInput] = useState('');
 
-  if (!isMember) {
-    return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-gray-100 p-10 text-center">
-        <div className="bg-white p-10 rounded-[3rem] shadow-xl">
-          <div className="text-5xl mb-4">🔒</div>
-          <h2 className="text-xl font-black text-gray-900 uppercase">Restricted</h2>
-          <p className="text-gray-500 text-xs mt-2 font-bold">Access is limited to assigned Care Team members.</p>
-          <button onClick={onBack} className="mt-8 w-full py-4 bg-purple-600 text-white rounded-2xl font-black uppercase text-xs">Return</button>
-        </div>
-      </div>
-    );
-  }
+  if (!patient) return <div className="p-10 text-center uppercase font-black">Patient Not Found</div>;
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#F3F3F7]">
-      <header className="p-4 bg-white border-b flex items-center justify-between shadow-sm">
-        <button onClick={onBack} className="font-black text-purple-600 text-xs uppercase tracking-widest">← Back</button>
-        <div className="text-center">
-          <h2 className="font-black text-sm uppercase leading-none">{patient.surname}</h2>
-          <p className="text-[9px] font-bold text-gray-400 uppercase">{patient.ward} • {patient.roomNumber}</p>
+    <div className="flex flex-col h-full bg-[#E5DDD5]"> {/* Viber-like background */}
+      {/* Clinical Header */}
+      <div className="p-4 bg-purple-700 text-white flex items-center gap-3 shrink-0">
+        <button onClick={onBack} className="text-2xl font-bold">←</button>
+        <div className="w-10 h-10 rounded-full bg-white text-purple-700 flex items-center justify-center font-black">
+          {patient.firstName[0]}{patient.surname[0]}
         </div>
-        <button onClick={() => setShowInfo(true)} className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 font-black border border-purple-100 flex items-center justify-center">i</button>
-      </header>
+        <div className="flex-1">
+          <h3 className="text-sm font-black uppercase leading-tight">{patient.surname}, {patient.firstName}</h3>
+          <p className="text-[9px] font-bold opacity-70 uppercase">{patient.ward} • {patient.diagnosis}</p>
+        </div>
+        <button className="bg-white/20 p-2 rounded-lg text-xs font-black uppercase">Care Team</button>
+      </div>
 
+      {/* Message Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((m: any) => (
-          <div key={m.id} className={`flex ${m.senderId === currentUser.id ? 'justify-end' : 'justify-start'}`}>
-            <div className={`p-4 rounded-[1.5rem] shadow-sm max-w-[80%] ${m.senderId === currentUser.id ? 'bg-purple-600 text-white' : 'bg-white text-gray-800'}`}>
-              <p className="text-sm font-bold leading-relaxed">{m.content}</p>
-              <p className="text-[8px] mt-2 opacity-60 font-black uppercase tracking-widest">
-                {new Date(m.timestamp).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-              </p>
+        {messages.map((msg) => {
+          const isMe = msg.senderId === currentUser.id;
+          const sender = users.find(u => u.id === msg.senderId);
+          return (
+            <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] p-3 rounded-2xl shadow-sm relative ${isMe ? 'bg-[#DCF8C6] rounded-tr-none' : 'bg-white rounded-tl-none'}`}>
+                {!isMe && <p className="text-[9px] font-black text-purple-600 uppercase mb-1">{sender?.surname} ({sender?.specialty})</p>}
+                <p className="text-sm text-gray-800">{msg.content}</p>
+                <div className="flex justify-end items-center gap-1 mt-1">
+                  <p className="text-[8px] text-gray-400 font-bold">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  {isMe && <span className="text-[10px]">✅</span>}
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      <div className="p-4 bg-white border-t flex items-center gap-3">
-        <button className="text-xl">📎</button>
-        <input className="flex-1 p-4 bg-gray-50 rounded-2xl text-sm border-2 border-gray-100 font-bold outline-none focus:border-purple-400" placeholder="Clinical note..." />
-        <button className="bg-purple-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase shadow-md shadow-purple-200">Send</button>
+      {/* Viber-Style Input Area */}
+      <div className="p-3 bg-gray-50 border-t flex items-center gap-2 shrink-0">
+        <button className="text-gray-400 text-xl font-bold p-2">📎</button>
+        <input 
+          value={input} onChange={(e) => setInput(e.target.value)}
+          placeholder="Type clinical note..."
+          className="flex-1 p-3 bg-white border rounded-full text-sm outline-none focus:border-purple-600"
+          onKeyPress={(e) => e.key === 'Enter' && (onSendMessage(input), setInput(''))}
+        />
+        <button 
+          onClick={() => { onSendMessage(input); setInput(''); }}
+          className="bg-purple-600 text-white w-10 h-10 rounded-full flex items-center justify-center font-bold"
+        >
+          →
+        </button>
       </div>
-
-      {showInfo && (
-        <div className="fixed inset-0 bg-black/60 z-[100] flex justify-end">
-          <div className="w-full max-w-sm bg-white h-full p-8 overflow-y-auto animate-in slide-in-from-right duration-300">
-            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-2xl font-black uppercase tracking-tighter">Clinical Log</h3>
-              <button onClick={() => setShowInfo(false)} className="bg-gray-100 p-2 rounded-lg text-gray-400 font-black text-[10px] uppercase">Close</button>
-            </div>
-            
-            <div className="space-y-8">
-               <div className="p-4 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-                  <label className="text-[9px] font-black text-gray-400 uppercase block mb-2">Assigned Staff</label>
-                  <select 
-                    className="w-full p-3 bg-white border-2 border-gray-100 rounded-xl text-[10px] font-black uppercase"
-                    onChange={async (e) => {
-                      await updateDoc(doc(db, 'patients', patient.id), { members: arrayUnion(e.target.value) });
-                    }}
-                  >
-                    <option>+ Add Colleague</option>
-                    {users.map((u:any) => <option key={u.id} value={u.id}>{u.surname}, {u.firstName}</option>)}
-                  </select>
-               </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
